@@ -38,14 +38,20 @@ class GroqClient:
             logger.error(f"Groq chat completion error: {e}")
             raise
     
-    async def transcribe_audio(self, audio_file_path: str) -> str:
-        """Transcribe audio using Whisper"""
+    async def transcribe_audio(self, audio_file_path: str, language: str = "en") -> str:
+        """Transcribe audio using Whisper
+        
+        Args:
+            audio_file_path: Path to audio file
+            language: Language code (default: "en" for English)
+        """
         try:
             with open(audio_file_path, "rb") as audio_file:
                 transcription = self.client.audio.transcriptions.create(
                     file=audio_file,
                     model=self.whisper_model,
-                    response_format="text"
+                    response_format="text",
+                    language=language  # Force language to prevent auto-detection
                 )
             return transcription
         except Exception as e:

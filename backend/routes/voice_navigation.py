@@ -22,79 +22,131 @@ class VoiceCommandResponse(BaseModel):
 @router.post("/voice-command", response_model=VoiceCommandResponse)
 async def process_voice_command(request: VoiceCommandRequest):
     """
-    Process voice command and determine action
+    Process voice command using AI to interpret intent
     """
     try:
-        command = request.command.lower().strip()
+        command = request.command.strip()
         
-        # Check for exit commands
-        exit_keywords = ['exit', 'quit', 'close', 'stop', 'goodbye', 'bye']
-        if any(keyword in command for keyword in exit_keywords):
+        # Use AI to interpret the command
+        interpretation = await interpret_command_with_ai(command, request.history)
+        
+        return interpretation
+        
+    except Exception as e:
+        print(f"Error processing voice command: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def interpret_command_with_ai(command: str, history: List[Dict[str, str]]) -> VoiceCommandResponse:
+    """
+    Use AI to interpret whether the command is a navigation request or a question
+    """
+    try:
+        # Build conversation context
+        messages = [
+            {
+                "role": "system",
+                "content": """You are a voice assistant for a web browser. Analyze user commands and respond in one of these formats:
+
+1. For navigation/opening websites:
+   COMMAND: open [url]
+   Example: "COMMAND: open https://youtube.com"
+   
+2. For search requests:
+   COMMAND: search [query]
+   Example: "COMMAND: search machine learning tutorials"
+   
+3. For exit/quit:
+   COMMAND: exit
+   
+4. For questions or conversations:
+   ANSWER: [your response]
+   Example: "ANSWER: The weather today is sunny."
+
+Rules:
+- If user wants to open/visit/go to a website, use "COMMAND: open [url]"
+- If user wants to search/find/google something, use "COMMAND: search [query]"
+- If user says exit/quit/goodbye, use "COMMAND: exit"
+- For questions, explanations, or conversations, use "ANSWER: [response]"
+- Keep answers concise (2-3 sentences max) for text-to-speech
+- For known websites (youtube, google, facebook, etc.), provide full URLs
+- Be friendly and conversational
+
+Respond ONLY in the format specified above."""
+            }
+        ]
+        
+        # Add recent history for context
+        for msg in history[-4:]:  # Last 4 messages
+            if msg['speaker'] == 'You':
+                messages.append({"role": "user", "content": msg['message']})
+            elif msg['speaker'] == 'AI':
+                messages.append({"role": "assistant", "content": msg['message']})
+        
+        # Add current command
+        messages.append({"role": "user", "content": command})
+        
+        # Get AI interpretation
+        completion = groq_client.chat.completions.create(
+            model=os.getenv("GROQ_MODEL", "mixtral-8x7b-32768"),
+            messages=messages,
+            temperature=0.3,
+            max_tokens=300,
+            top_p=1,
+            stream=False
+        )
+        
+        ai_response = completion.choices[0].message.content.strip()
+        
+        # Parse AI response
+        if ai_response.startswith("COMMAND: open "):
+            target = ai_response.replace("COMMAND: open ", "").strip()
+            url = get_url_from_target(target)
+            return VoiceCommandResponse(
+                action='navigate',
+                response=f"Opening {target}",
+                url=url
+            )
+        
+        elif ai_response.startswith("COMMAND: search "):
+            query = ai_response.replace("COMMAND: search ", "").strip()
+            url = f"https://www.google.com/search?q={query.replace(' ', '+')}"
+            return VoiceCommandResponse(
+                action='navigate',
+                response=f"Searching for {query}",
+                url=url
+            )
+        
+        elif ai_response.startswith("COMMAND: exit"):
             return VoiceCommandResponse(
                 action='exit',
                 response="Goodbye! Have a great day!",
                 url=None
             )
         
-        # Check for navigation commands
-        navigation_patterns = [
-            r'open\s+(.+)',
-            r'go\s+to\s+(.+)',
-            r'visit\s+(.+)',
-            r'navigate\s+to\s+(.+)',
-            r'take\s+me\s+to\s+(.+)',
-            r'show\s+me\s+(.+)',
-        ]
+        elif ai_response.startswith("ANSWER: "):
+            answer = ai_response.replace("ANSWER: ", "").strip()
+            return VoiceCommandResponse(
+                action='answer',
+                response=answer,
+                url=None
+            )
         
-        for pattern in navigation_patterns:
-            match = re.search(pattern, command, re.IGNORECASE)
-            if match:
-                target = match.group(1).strip()
-                url = get_url_from_target(target)
-                
-                response_text = f"Okay, opening {target}. Please wait..."
-                
-                return VoiceCommandResponse(
-                    action='navigate',
-                    response=response_text,
-                    url=url
-                )
-        
-        # Check for search commands
-        search_patterns = [
-            r'search\s+for\s+(.+)',
-            r'find\s+(.+)',
-            r'look\s+up\s+(.+)',
-            r'google\s+(.+)',
-        ]
-        
-        for pattern in search_patterns:
-            match = re.search(pattern, command, re.IGNORECASE)
-            if match:
-                query = match.group(1).strip()
-                url = f"https://www.google.com/search?q={query.replace(' ', '+')}"
-                
-                response_text = f"Searching for {query}..."
-                
-                return VoiceCommandResponse(
-                    action='navigate',
-                    response=response_text,
-                    url=url
-                )
-        
-        # If not a navigation command, treat as a question
-        # Use AI to answer
-        answer = await get_ai_answer(command, request.history)
-        
-        return VoiceCommandResponse(
-            action='answer',
-            response=answer,
-            url=None
-        )
+        else:
+            # Fallback: treat as answer if format is unexpected
+            return VoiceCommandResponse(
+                action='answer',
+                response=ai_response,
+                url=None
+            )
         
     except Exception as e:
-        print(f"Error processing voice command: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error interpreting command with AI: {e}")
+        return VoiceCommandResponse(
+            action='answer',
+            response="I'm sorry, I didn't understand that. Could you please try again?",
+            url=None
+        )
 
 def get_url_from_target(target: str) -> str:
     """
@@ -143,46 +195,6 @@ def get_url_from_target(target: str) -> str:
     
     # Default: search on Google
     return f"https://www.google.com/search?q={target.replace(' ', '+')}"
-
-async def get_ai_answer(question: str, history: List[Dict[str, str]]) -> str:
-    """
-    Get AI answer for a question using Groq
-    """
-    try:
-        # Build conversation context
-        messages = [
-            {
-                "role": "system",
-                "content": "You are a helpful voice assistant in a web browser. Provide concise, clear answers suitable for text-to-speech. Keep responses under 3 sentences when possible. Be friendly and conversational."
-            }
-        ]
-        
-        # Add recent history for context
-        for msg in history[-4:]:  # Last 4 messages
-            if msg['speaker'] == 'You':
-                messages.append({"role": "user", "content": msg['message']})
-            elif msg['speaker'] == 'AI':
-                messages.append({"role": "assistant", "content": msg['message']})
-        
-        # Add current question
-        messages.append({"role": "user", "content": question})
-        
-        # Get AI response
-        completion = groq_client.chat.completions.create(
-            model="llama-3.1-70b-versatile",
-            messages=messages,
-            temperature=0.7,
-            max_tokens=200,
-            top_p=1,
-            stream=False
-        )
-        
-        answer = completion.choices[0].message.content.strip()
-        return answer
-        
-    except Exception as e:
-        print(f"Error getting AI answer: {e}")
-        return "I'm sorry, I couldn't find an answer to that question. Could you please try rephrasing it?"
 
 @router.get("/test")
 async def test_voice_navigation():

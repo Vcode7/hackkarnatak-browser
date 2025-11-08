@@ -103,7 +103,7 @@ export default function AiChat() {
             return JSON.stringify({
               title: title,
               description: metaDescription,
-              content: bodyText.slice(0, 5000) // limit to 5k chars
+              content: bodyText.slice(0, 10000) // limit to 20k chars
             });
           } catch (e) {
             return JSON.stringify({ error: e.message });

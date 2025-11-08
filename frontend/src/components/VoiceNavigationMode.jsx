@@ -245,13 +245,16 @@ function VoiceNavigationMode({ isActive, onClose, onNavigate }) {
   // Toggle pause/resume
   const togglePause = () => {
     const newPausedState = !isPaused;
-    setIsPaused(newPausedState);
     
     if (newPausedState) {
-      // Pausing - stop any ongoing speech and recording
+      // Pausing - IMMEDIATELY stop all speech and recording
       if (synthRef.current) {
         try {
           synthRef.current.cancel();
+          // Force stop any queued speech
+          if (synthRef.current.speaking) {
+            synthRef.current.cancel();
+          }
         } catch (e) {
           console.warn('[VoiceNav] Could not cancel speech on pause:', e);
         }
@@ -262,10 +265,15 @@ function VoiceNavigationMode({ isActive, onClose, onNavigate }) {
         stopRecording();
       }
       
-      speak("Voice navigation paused. Click play to resume.");
+      // Set paused state BEFORE speaking
+      setIsPaused(true);
+      
+      // Add to history without speaking
       addToHistory('AI', "Voice navigation paused.");
+      setAiResponse("Voice navigation paused.");
     } else {
       // Resuming
+      setIsPaused(false);
       speak("Resuming voice navigation. What would you like to do?");
       addToHistory('AI', "Resuming voice navigation. What would you like to do?");
     }
@@ -273,6 +281,24 @@ function VoiceNavigationMode({ isActive, onClose, onNavigate }) {
 
   // Save state when closing
   const handleClose = () => {
+    // IMMEDIATELY stop all speech and recording
+    if (synthRef.current) {
+      try {
+        synthRef.current.cancel();
+        // Force stop any queued speech
+        if (synthRef.current.speaking) {
+          synthRef.current.cancel();
+        }
+      } catch (e) {
+        console.warn('[VoiceNav] Could not cancel speech on close:', e);
+      }
+    }
+    setIsSpeaking(false);
+    
+    if (isListening) {
+      stopRecording();
+    }
+    
     // Save current state to session storage
     const state = {
       history: conversationHistory,
@@ -281,24 +307,17 @@ function VoiceNavigationMode({ isActive, onClose, onNavigate }) {
     };
     sessionStorage.setItem('voiceNavState', JSON.stringify(state));
     
-    // Stop any ongoing operations
-    if (synthRef.current) {
-      try {
-        synthRef.current.cancel();
-      } catch (e) {
-        console.warn('[VoiceNav] Could not cancel speech on close:', e);
-      }
-    }
-    if (isListening) {
-      stopRecording();
-    }
-    
     onClose();
   };
 
   // Text-to-Speech
   const speak = (text) => {
-    if (isMuted || isPaused) return;
+    // Check pause/mute state FIRST
+    if (isMuted || isPaused) {
+      console.log('[VoiceNav] Speech blocked - muted or paused');
+      setAiResponse(text);
+      return;
+    }
 
     // Check if speech synthesis is available
     if (!synthRef.current) {
@@ -310,6 +329,10 @@ function VoiceNavigationMode({ isActive, onClose, onNavigate }) {
     // Cancel any ongoing speech
     try {
       synthRef.current.cancel();
+      // Double-check to force stop
+      if (synthRef.current.speaking) {
+        synthRef.current.cancel();
+      }
     } catch (e) {
       console.warn('[VoiceNav] Could not cancel speech:', e);
     }
@@ -327,8 +350,8 @@ function VoiceNavigationMode({ isActive, onClose, onNavigate }) {
 
     utterance.onend = () => {
       setIsSpeaking(false);
-      // Auto-start listening after AI finishes speaking (only if not paused)
-      if (isActive && !isListening && !isProcessing && !isPaused) {
+      // Auto-start listening after AI finishes speaking (only if not paused or muted)
+      if (isActive && !isListening && !isProcessing && !isPaused && !isMuted) {
         setTimeout(() => {
           startRecording();
         }, 800);
@@ -412,15 +435,23 @@ function VoiceNavigationMode({ isActive, onClose, onNavigate }) {
 
   // Toggle mute
   const toggleMute = () => {
-    setIsMuted(!isMuted);
-    if (!isMuted && synthRef.current) {
+    const newMutedState = !isMuted;
+    
+    if (newMutedState && synthRef.current) {
+      // Muting - IMMEDIATELY stop all speech
       try {
         synthRef.current.cancel();
+        // Force stop any queued speech
+        if (synthRef.current.speaking) {
+          synthRef.current.cancel();
+        }
       } catch (e) {
         console.warn('[VoiceNav] Could not cancel speech on mute:', e);
       }
       setIsSpeaking(false);
     }
+    
+    setIsMuted(newMutedState);
   };
 
   if (!isActive) return null;

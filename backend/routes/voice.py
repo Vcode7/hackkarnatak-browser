@@ -26,8 +26,8 @@ async def process_voice_command(request: VoiceCommandRequest):
                 temp_audio_path = temp_audio.name
             
             try:
-                # Transcribe
-                transcribed_text = await groq_client.transcribe_audio(temp_audio_path)
+                # Transcribe in English only
+                transcribed_text = await groq_client.transcribe_audio(temp_audio_path, language="en")
             finally:
                 # Clean up temp file
                 if os.path.exists(temp_audio_path):
