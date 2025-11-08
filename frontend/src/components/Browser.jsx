@@ -32,6 +32,7 @@ import Downloads from './Downloads'
 import HighlightImportant from './HighlightImportant'
 import MobileBottomBar from './MobileBottomBar'
 import Notes from './Notes'
+import HistoryQuiz from './HistoryQuiz'
 import axios from 'axios'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -72,6 +73,7 @@ export default function Browser() {
   const [isHighlightOpen, setIsHighlightOpen] = useState(false)
   const [isVoiceNavActive, setIsVoiceNavActive] = useState(false)
   const [isNotesOpen, setIsNotesOpen] = useState(false)
+  const [isQuizOpen, setIsQuizOpen] = useState(false)
   const webviewRef = useRef(null)
 
   // Register webview when it changes
@@ -597,6 +599,7 @@ export default function Browser() {
           loadSettings()
         }}
         onNotesClick={() => setIsNotesOpen(true)}
+        onQuizClick={() => setIsQuizOpen(true)}
       />
 
       {/* Downloads Modal */}
@@ -623,6 +626,12 @@ export default function Browser() {
       <Notes 
         isOpen={isNotesOpen} 
         onClose={() => setIsNotesOpen(false)} 
+      />
+
+      {/* History Quiz Modal */}
+      <HistoryQuiz 
+        isOpen={isQuizOpen} 
+        onClose={() => setIsQuizOpen(false)} 
       />
 
       {/* Mobile Bottom Bar - Only show on Capacitor */}
