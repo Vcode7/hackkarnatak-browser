@@ -81,6 +81,14 @@ class HighlightRequest(BaseModel):
 class WebsiteSuggestionRequest(BaseModel):
     topic: str
 
+class GenerateQuestionsRequest(BaseModel):
+    topic: str
+
+class AnswerQuestionsRequest(BaseModel):
+    topic: str
+    questions: List[str]
+    answers: List[str]
+
 @router.post("/chat", response_model=AIResponse)
 async def chat(request: AIRequest):
     """General AI chat endpoint"""
@@ -196,6 +204,160 @@ async def suggest_websites(request: WebsiteSuggestionRequest):
     except Exception as e:
         logger.error(f"Website suggestion error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/generate-questions")
+async def generate_questions(request: GenerateQuestionsRequest):
+    """Generate AI questions to assess user's knowledge about a topic"""
+    try:
+        prompt = f"""You are an educational assistant. Generate exactly 5 questions to assess a user's knowledge level about the topic: "{request.topic}".
+
+The questions should:
+1. Range from basic to intermediate difficulty
+2. Help understand what the user already knows
+3. Be clear and concise
+4. Cover different aspects of the topic
+
+Return ONLY a JSON object with this exact format:
+{{
+    "questions": [
+        "Question 1 text here?",
+        "Question 2 text here?",
+        "Question 3 text here?",
+        "Question 4 text here?",
+        "Question 5 text here?"
+    ]
+}}
+
+Topic: {request.topic}
+
+Your response (JSON only):"""
+
+        # Call AI to generate questions
+        response = await langchain_service.general_chat(
+            query=prompt,
+            context=f"Generating assessment questions for topic: {request.topic}"
+        )
+        
+        # Parse JSON response
+        json_match = re.search(r'\{.*"questions".*\}', response, re.DOTALL)
+        if json_match:
+            result = json.loads(json_match.group())
+            questions = result.get('questions', [])
+        else:
+            # Fallback: extract questions manually
+            questions = []
+            lines = response.split('\n')
+            for line in lines:
+                line = line.strip()
+                if line and ('?' in line or line[0].isdigit()):
+                    # Clean up the question
+                    question = re.sub(r'^\d+[\.\)]\s*', '', line)
+                    question = question.strip('"\'')
+                    if question and len(questions) < 5:
+                        questions.append(question)
+        
+        # Ensure we have exactly 5 questions
+        if len(questions) < 5:
+            questions.extend([
+                f"What do you already know about {request.topic}?",
+                f"What specific aspect of {request.topic} interests you most?",
+                f"What is your current skill level with {request.topic}?",
+                f"What would you like to learn about {request.topic}?",
+                f"Have you studied {request.topic} before?"
+            ])
+        
+        questions = questions[:5]
+        
+        logger.info(f"Generated {len(questions)} questions for topic: {request.topic}")
+        
+        return {
+            "success": True,
+            "questions": questions,
+            "topic": request.topic
+        }
+        
+    except Exception as e:
+        logger.error(f"Question generation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/suggest-websites-ai")
+async def suggest_websites_ai(request: AnswerQuestionsRequest):
+    """Generate AI-powered website suggestions based on user's answers"""
+    try:
+        # Build context from Q&A
+        qa_context = "\n".join([
+            f"Q: {q}\nA: {a}"
+            for q, a in zip(request.questions, request.answers)
+        ])
+        
+        prompt = f"""You are an educational resource curator. Based on the user's knowledge level and interests about "{request.topic}", suggest the 10 most relevant and helpful websites.
+
+User's Assessment:
+{qa_context}
+
+Task: Recommend exactly 10 websites that match the user's knowledge level and learning goals. Include a mix of:
+- Beginner-friendly resources if they're new to the topic
+- Advanced resources if they're experienced
+- Interactive learning platforms
+- Documentation and reference sites
+- Community forums or discussion boards
+
+Return ONLY a JSON object with this exact format:
+{{
+    "websites": [
+        {{
+            "title": "Website Name",
+            "description": "Brief description of what this site offers and why it's relevant",
+            "url": "https://example.com",
+            "difficulty": "beginner|intermediate|advanced"
+        }}
+    ]
+}}
+
+Provide real, working URLs for popular educational websites. Your response (JSON only):"""
+
+        # Call AI to generate suggestions
+        response = await langchain_service.general_chat(
+            query=prompt,
+            context=f"Generating personalized website suggestions for: {request.topic}"
+        )
+        
+        # Parse JSON response
+        json_match = re.search(r'\{.*"websites".*\}', response, re.DOTALL)
+        if json_match:
+            result = json.loads(json_match.group())
+            websites = result.get('websites', [])
+        else:
+            # Fallback to predefined suggestions
+            websites = await generate_website_suggestions(request.topic, "")
+        
+        # Ensure we have up to 10 websites
+        websites = websites[:10]
+        
+        # If we got fewer than 10, supplement with predefined ones
+        if len(websites) < 10:
+            fallback = await generate_website_suggestions(request.topic, "")
+            for site in fallback:
+                if len(websites) >= 10:
+                    break
+                if not any(w.get('url') == site['url'] for w in websites):
+                    websites.append(site)
+        
+        logger.info(f"Generated {len(websites)} AI-powered suggestions for topic: {request.topic}")
+        
+        return {
+            "success": True,
+            "suggested_websites": websites,
+            "topic": request.topic,
+            "count": len(websites)
+        }
+        
+    except Exception as e:
+        logger.error(f"AI website suggestion error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/highlight-important")
 async def highlight_important(request: HighlightRequest):

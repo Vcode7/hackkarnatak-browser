@@ -109,10 +109,8 @@ const ElectronWebView = forwardRef(({
       if (onLoadStop) onLoadStop();
     };
 
-    const handleNewWindow = (e) => {
-      e.preventDefault(); // Don’t open popups in new windows
-      if (e.url) webview.loadURL(e.url); // Load inside same webview
-    };
+    // Note: new-window handling is done in main.cjs via setWindowOpenHandler
+    // to avoid duplicate tab creation
 
     /** ⚡ Simulate progress bar */
     let progressInterval;
@@ -134,7 +132,6 @@ const ElectronWebView = forwardRef(({
     webview.addEventListener('did-stop-loading', handleDidStopLoading);
     webview.addEventListener('did-fail-load', handleDidFailLoad);
     webview.addEventListener('page-title-updated', handlePageTitleUpdated);
-    webview.addEventListener('new-window', handleNewWindow);
 
     return () => {
       console.log('Cleaning up webview listeners for tab:', tabId);
@@ -146,7 +143,6 @@ const ElectronWebView = forwardRef(({
       webview.removeEventListener('did-stop-loading', handleDidStopLoading);
       webview.removeEventListener('did-fail-load', handleDidFailLoad);
       webview.removeEventListener('page-title-updated', handlePageTitleUpdated);
-      webview.removeEventListener('new-window', handleNewWindow);
     };
   }, [tabId, url, onNavigate, onTitleUpdate, onLoadStart, onLoadProgress, onLoadStop]);
 

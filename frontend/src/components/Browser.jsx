@@ -90,6 +90,12 @@ export default function Browser() {
   }, [activeTab?.url])
 
   useEffect(() => {
+    // Track recently opened URLs to prevent duplicates
+    const recentlyOpened = new Set()
+    const clearRecentUrl = (url) => {
+      setTimeout(() => recentlyOpened.delete(url), 1000)
+    }
+
     // Listen for IPC messages from Electron
     if (window.electron && window.electron.receive) {
       window.electron.receive('ask-ai-with-selection', (selectedText) => {
@@ -104,7 +110,15 @@ export default function Browser() {
       })
 
       window.electron.receive('open-link-new-tab', (url) => {
-        // Open link in new tab
+        // Prevent duplicate tabs
+        if (recentlyOpened.has(url)) {
+          console.log('Prevented duplicate tab for:', url)
+          return
+        }
+        recentlyOpened.add(url)
+        clearRecentUrl(url)
+        
+        console.log('Opening link in new tab (IPC):', url)
         addTab(url)
       })
     }

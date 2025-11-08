@@ -72,8 +72,8 @@ function createWindow() {
     // Handle new window requests from the webview
     webContents.setWindowOpenHandler(({ url }) => {
       console.log('New window requested for URL:', url)
-      // Open in a new application window
-      createWindow()
+      // Instead of opening a new application window, send message to open in new tab
+      newWindow.webContents.send('open-link-new-tab', url)
       return { action: 'deny' }
     })
 
