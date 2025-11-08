@@ -19,14 +19,16 @@ contextBridge.exposeInMainWorld('electron', {
     }
   },
   receive: (channel, func) => {
-    const validChannels = ['fromMain', 'ask-ai-with-selection', 'open-link-new-tab']
+    const validChannels = ['fromMain', 'ask-ai-with-selection', 'open-link-new-tab', 'save-as-note']
     if (validChannels.includes(channel)) {
+      // Remove existing listeners to prevent duplicates
+      ipcRenderer.removeAllListeners(channel)
       ipcRenderer.on(channel, (event, ...args) => func(...args))
     }
   },
   // One-time listener for IPC messages
   once: (channel, func) => {
-    const validChannels = ['ask-ai-with-selection', 'open-link-new-tab']
+    const validChannels = ['ask-ai-with-selection', 'open-link-new-tab', 'save-as-note']
     if (validChannels.includes(channel)) {
       ipcRenderer.once(channel, (event, ...args) => func(...args))
     }

@@ -93,71 +93,88 @@ export default function Browser() {
     setUrlInput(activeTab?.url || '')
   }, [activeTab?.url])
 
+  // Separate useEffect for IPC listeners (only run once)
   useEffect(() => {
-    // Track recently opened URLs to prevent duplicates
+    // Only set up IPC listeners if in Electron and not already set up
+    if (!window.electron || !window.electron.receive) return
+
+    const recentlyOpened = new Set()
+    
+    const handleAskAI = (selectedText) => {
+      console.log('[Browser] Ask AI with selection:', selectedText)
+      // Open AI chat with selected text as context
+      const event = new CustomEvent('open-ai-chat', {
+        detail: {
+          message: `Explain or help with: "${selectedText}"`,
+          context: selectedText
+        }
+      })
+      window.dispatchEvent(event)
+    }
+
+    const handleSaveNote = async (data) => {
+      console.log('[Browser] Save note:', data)
+      // Save note directly via API
+      try {
+        await axios.post(`${API_URL}/api/notes`, {
+          content: data.selectedText,
+          page_url: data.pageUrl,
+          page_title: data.pageTitle
+        })
+        
+        // Show success notification
+        const notification = document.createElement('div')
+        notification.textContent = '✓ Note saved successfully'
+        notification.style.cssText = `
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: #10b981;
+          color: white;
+          padding: 12px 20px;
+          border-radius: 8px;
+          box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+          z-index: 10000;
+          font-size: 14px;
+          font-weight: 500;
+        `
+        document.body.appendChild(notification)
+        setTimeout(() => notification.remove(), 3000)
+      } catch (error) {
+        console.error('Error saving note:', error)
+        alert('Failed to save note')
+      }
+    }
+
+    const handleOpenLink = (url) => {
+      console.log('[Browser] Open link in new tab:', url)
+      // Prevent duplicate tabs
+      if (recentlyOpened.has(url)) {
+        console.log('Prevented duplicate tab for:', url)
+        return
+      }
+      recentlyOpened.add(url)
+      setTimeout(() => recentlyOpened.delete(url), 1000)
+      
+      addTab(url)
+    }
+
+    // Register IPC listeners
+    window.electron.receive('ask-ai-with-selection', handleAskAI)
+    window.electron.receive('save-as-note', handleSaveNote)
+    window.electron.receive('open-link-new-tab', handleOpenLink)
+
+    // Cleanup is not possible with current preload setup, but we only register once
+    return () => {
+      // Note: electron.receive doesn't provide removeListener in current implementation
+      console.log('[Browser] IPC listeners cleanup (listeners remain active)')
+    }
+  }, []) // Empty dependency array - only run once
+
+  useEffect(() => {
     const recentlyOpened = new Set()
     const clearRecentUrl = (url) => {
       setTimeout(() => recentlyOpened.delete(url), 1000)
-    }
-
-    // Listen for IPC messages from Electron
-    if (window.electron && window.electron.receive) {
-      window.electron.receive('ask-ai-with-selection', (selectedText) => {
-        // Open AI chat with selected text as context
-        const event = new CustomEvent('open-ai-chat', {
-          detail: {
-            message: `Explain or help with: "${selectedText}"`,
-            context: selectedText
-          }
-        })
-        window.dispatchEvent(event)
-      })
-
-      window.electron.receive('save-as-note', async (data) => {
-        // Save note directly via API
-        try {
-          await axios.post(`${API_URL}/api/notes`, {
-            content: data.selectedText,
-            page_url: data.pageUrl,
-            page_title: data.pageTitle
-          })
-          
-          // Show success notification
-          const notification = document.createElement('div')
-          notification.textContent = '✓ Note saved successfully'
-          notification.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: #10b981;
-            color: white;
-            padding: 12px 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            z-index: 10000;
-            font-size: 14px;
-            font-weight: 500;
-          `
-          document.body.appendChild(notification)
-          setTimeout(() => notification.remove(), 3000)
-        } catch (error) {
-          console.error('Error saving note:', error)
-          alert('Failed to save note')
-        }
-      })
-
-      window.electron.receive('open-link-new-tab', (url) => {
-        // Prevent duplicate tabs
-        if (recentlyOpened.has(url)) {
-          console.log('Prevented duplicate tab for:', url)
-          return
-        }
-        recentlyOpened.add(url)
-        clearRecentUrl(url)
-        
-        console.log('Opening link in new tab (IPC):', url)
-        addTab(url)
-      })
     }
 
     // Listen for navigate-to-url event from AI chat

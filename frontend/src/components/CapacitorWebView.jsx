@@ -1,40 +1,73 @@
-import { useEffect, useState, useRef } from 'react';
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react'
+import { Loader } from 'lucide-react'
+import { useBrowser } from '../context/BrowserContext'
 
 /**
  * Capacitor WebView component using iframe for mobile
  * Note: Native WebView plugins can't be embedded in the DOM on Android,
  * so we use iframe which works well on mobile browsers
  */
-function CapacitorWebView({ url, tabId, onNavigate, className, style }) {
-  const [currentUrl, setCurrentUrl] = useState(url);
-  const [isLoading, setIsLoading] = useState(false);
-  const iframeRef = useRef(null);
+const CapacitorWebView = forwardRef(({ url, tabId, onNavigate, className, style }, ref) => {
+  const [isLoading, setIsLoading] = useState(true)
+  const [currentUrl, setCurrentUrl] = useState(url)
+  const iframeRef = useRef(null)
+  const { registerWebview, unregisterWebview } = useBrowser()
+
+  // Expose iframe methods through ref
+  useImperativeHandle(ref, () => ({
+    executeJavaScript: async (code) => {
+      // For cross-origin iframes, we can't execute JavaScript directly
+      // Return a message indicating this limitation
+      console.warn('[CapacitorWebView] Cannot execute JavaScript in cross-origin iframe')
+      throw new Error('Cross-origin iframe - JavaScript execution not supported. Use Electron for full features.')
+    },
+    contentWindow: iframeRef.current?.contentWindow
+  }))
+
+  // Register iframe as webview
+  useEffect(() => {
+    if (iframeRef.current && tabId) {
+      registerWebview(tabId, {
+        executeJavaScript: async (code) => {
+          // For cross-origin iframes, we can't execute JavaScript directly
+          console.warn('[CapacitorWebView] Cannot execute JavaScript in cross-origin iframe')
+          throw new Error('Cross-origin iframe - JavaScript execution not supported. Use Electron for full features.')
+        }
+      })
+    }
+
+    return () => {
+      if (tabId) {
+        unregisterWebview(tabId)
+      }
+    }
+  }, [tabId, registerWebview, unregisterWebview])
 
   useEffect(() => {
     if (url) {
-      setCurrentUrl(url);
-      setIsLoading(true);
+      setCurrentUrl(url)
+      setIsLoading(true)
     }
-  }, [url]);
+  }, [url])
 
   const handleLoad = () => {
-    setIsLoading(false);
+    setIsLoading(false)
     // Try to get the iframe's current URL (may be blocked by CORS)
     try {
       if (iframeRef.current && iframeRef.current.contentWindow) {
-        const iframeUrl = iframeRef.current.contentWindow.location.href;
+        const iframeUrl = iframeRef.current.contentWindow.location.href
         if (iframeUrl && iframeUrl !== 'about:blank' && iframeUrl !== currentUrl) {
-          setCurrentUrl(iframeUrl);
+          setCurrentUrl(iframeUrl)
           if (onNavigate) {
-            onNavigate(tabId, iframeUrl);
+            onNavigate(tabId, iframeUrl)
           }
         }
       }
     } catch (e) {
       // CORS will block this, which is expected
-      console.log('[CapacitorWebView] Cannot access iframe URL due to CORS');
+      console.log('[CapacitorWebView] Cannot access iframe URL due to CORS')
     }
-  };
+  }
 
   return (
     <div
@@ -61,7 +94,7 @@ function CapacitorWebView({ url, tabId, onNavigate, className, style }) {
         title="Web Browser"
       />
     </div>
-  );
-}
+  )
+})
 
-export default CapacitorWebView;
+export default CapacitorWebView

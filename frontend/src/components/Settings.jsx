@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { X, Save, Trash2, Search, Bookmark, Clock, Globe, Shield, Palette, Zap, Database, StickyNote, Brain } from 'lucide-react'
 import axios from 'axios'
+import { isCapacitor } from '../utils/platform'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -168,65 +169,71 @@ export default function Settings({ isOpen, onClose, onNotesClick, onQuizClick })
 
         <div className="flex flex-1 overflow-hidden">
           {/* Sidebar */}
-          <div className="w-64 border-r border-border p-4 space-y-2">
+          <div className={`border-r border-border p-2 space-y-1 ${isCapacitor() ? 'w-16' : 'w-64 p-4 space-y-2'}`}>
             <button
               onClick={() => setActiveTab('general')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+              className={`w-full flex items-center ${isCapacitor() ? 'justify-center p-2' : 'gap-3 px-4 py-3'} rounded-lg text-left transition-colors ${
                 activeTab === 'general' ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary'
               }`}
+              title="General"
             >
-              <Globe size={20} />
-              <span>General</span>
+              <Globe size={isCapacitor() ? 18 : 20} />
+              {!isCapacitor() && <span>General</span>}
             </button>
             
             <button
               onClick={() => setActiveTab('appearance')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+              className={`w-full flex items-center ${isCapacitor() ? 'justify-center p-2' : 'gap-3 px-4 py-3'} rounded-lg text-left transition-colors ${
                 activeTab === 'appearance' ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary'
               }`}
+              title="Appearance"
             >
-              <Palette size={20} />
-              <span>Appearance</span>
+              <Palette size={isCapacitor() ? 18 : 20} />
+              {!isCapacitor() && <span>Appearance</span>}
             </button>
             
             <button
               onClick={() => setActiveTab('privacy')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+              className={`w-full flex items-center ${isCapacitor() ? 'justify-center p-2' : 'gap-3 px-4 py-3'} rounded-lg text-left transition-colors ${
                 activeTab === 'privacy' ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary'
               }`}
+              title="Privacy"
             >
-              <Shield size={20} />
-              <span>Privacy</span>
+              <Shield size={isCapacitor() ? 18 : 20} />
+              {!isCapacitor() && <span>Privacy</span>}
             </button>
             
             <button
               onClick={() => setActiveTab('ai')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+              className={`w-full flex items-center ${isCapacitor() ? 'justify-center p-2' : 'gap-3 px-4 py-3'} rounded-lg text-left transition-colors ${
                 activeTab === 'ai' ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary'
               }`}
+              title="AI Features"
             >
-              <Zap size={20} />
-              <span>AI Features</span>
+              <Zap size={isCapacitor() ? 18 : 20} />
+              {!isCapacitor() && <span>AI Features</span>}
             </button>
             
             <button
               onClick={() => setActiveTab('bookmarks')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+              className={`w-full flex items-center ${isCapacitor() ? 'justify-center p-2' : 'gap-3 px-4 py-3'} rounded-lg text-left transition-colors ${
                 activeTab === 'bookmarks' ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary'
               }`}
+              title="Bookmarks"
             >
-              <Bookmark size={20} />
-              <span>Bookmarks</span>
+              <Bookmark size={isCapacitor() ? 18 : 20} />
+              {!isCapacitor() && <span>Bookmarks</span>}
             </button>
             
             <button
               onClick={() => setActiveTab('history')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+              className={`w-full flex items-center ${isCapacitor() ? 'justify-center p-2' : 'gap-3 px-4 py-3'} rounded-lg text-left transition-colors ${
                 activeTab === 'history' ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary'
               }`}
+              title="History"
             >
-              <Clock size={20} />
-              <span>History</span>
+              <Clock size={isCapacitor() ? 18 : 20} />
+              {!isCapacitor() && <span>History</span>}
             </button>
             
             <button
@@ -234,10 +241,11 @@ export default function Settings({ isOpen, onClose, onNotesClick, onQuizClick })
                 onClose()
                 if (onNotesClick) onNotesClick()
               }}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors hover:bg-secondary"
+              className={`w-full flex items-center ${isCapacitor() ? 'justify-center p-2' : 'gap-3 px-4 py-3'} rounded-lg text-left transition-colors hover:bg-secondary`}
+              title="Notes"
             >
-              <StickyNote size={20} />
-              <span>Notes</span>
+              <StickyNote size={isCapacitor() ? 18 : 20} />
+              {!isCapacitor() && <span>Notes</span>}
             </button>
             
             <button
@@ -245,20 +253,22 @@ export default function Settings({ isOpen, onClose, onNotesClick, onQuizClick })
                 onClose()
                 if (onQuizClick) onQuizClick()
               }}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors hover:bg-secondary"
+              className={`w-full flex items-center ${isCapacitor() ? 'justify-center p-2' : 'gap-3 px-4 py-3'} rounded-lg text-left transition-colors hover:bg-secondary`}
+              title="History Quiz"
             >
-              <Brain size={20} />
-              <span>History Quiz</span>
+              <Brain size={isCapacitor() ? 18 : 20} />
+              {!isCapacitor() && <span>History Quiz</span>}
             </button>
             
             <button
               onClick={() => setActiveTab('data')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+              className={`w-full flex items-center ${isCapacitor() ? 'justify-center p-2' : 'gap-3 px-4 py-3'} rounded-lg text-left transition-colors ${
                 activeTab === 'data' ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary'
               }`}
+              title="Data"
             >
-              <Database size={20} />
-              <span>Data</span>
+              <Database size={isCapacitor() ? 18 : 20} />
+              {!isCapacitor() && <span>Data</span>}
             </button>
           </div>
 

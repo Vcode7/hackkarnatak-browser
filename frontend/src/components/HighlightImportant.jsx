@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import { Highlighter, X, Loader, Sparkles } from 'lucide-react'
 import axios from 'axios'
+import { useBrowser } from '../context/BrowserContext'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
-export default function HighlightImportant({ isOpen, onClose, activeWebview }) {
+export default function HighlightImportant({ isOpen, onClose, activeWebview: propWebview }) {
+  const { activeTab } = useBrowser()
+  const activeWebview = propWebview || activeTab?.webview
   const [topic, setTopic] = useState('')
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState('')
@@ -26,7 +29,9 @@ export default function HighlightImportant({ isOpen, onClose, activeWebview }) {
 
     try {
       // Step 1: Extract page HTML and text content
-      const pageContent = await activeWebview.executeJavaScript(`
+      let pageContent
+      try {
+        pageContent = await activeWebview.executeJavaScript(`
         (function() {
           // Get all text content with their elements
           const elements = [];
@@ -80,6 +85,15 @@ export default function HighlightImportant({ isOpen, onClose, activeWebview }) {
           };
         })()
       `)
+      } catch (jsError) {
+        // Handle cross-origin iframe error
+        if (jsError.message.includes('Cross-origin')) {
+          alert('⚠️ Highlight feature is not available on mobile app due to browser security restrictions. Please use the desktop app for full features.')
+          setLoading(false)
+          return
+        }
+        throw jsError
+      }
 
       console.log('Extracted elements:', pageContent.elements.length)
       setStatus(`Analyzing ${pageContent.elements.length} sections with AI...`)
