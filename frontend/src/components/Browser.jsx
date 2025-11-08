@@ -49,7 +49,9 @@ export default function Browser() {
     navigateForward,
     refresh,
     canGoBack,
-    canGoForward
+    canGoForward,
+    registerWebview,
+    unregisterWebview
   } = useBrowser()
 
   const { theme, toggleTheme } = useTheme()
@@ -69,6 +71,19 @@ export default function Browser() {
   const [isHighlightOpen, setIsHighlightOpen] = useState(false)
   const [isVoiceNavActive, setIsVoiceNavActive] = useState(false)
   const webviewRef = useRef(null)
+
+  // Register webview when it changes
+  useEffect(() => {
+    if (webviewRef.current && activeTabId) {
+      registerWebview(activeTabId, webviewRef.current)
+      console.log('Registered webview for tab:', activeTabId)
+    }
+    return () => {
+      if (activeTabId) {
+        unregisterWebview(activeTabId)
+      }
+    }
+  }, [webviewRef.current, activeTabId, registerWebview, unregisterWebview])
 
   useEffect(() => {
     setUrlInput(activeTab?.url || '')

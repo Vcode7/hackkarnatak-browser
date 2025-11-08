@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, X, Volume2, VolumeX } from 'lucide-react';
+import { Mic, MicOff, X, Volume2, VolumeX, Pause, Play } from 'lucide-react';
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -18,6 +18,7 @@ function VoiceNavigationMode({ isActive, onClose, onNavigate }) {
   const [recordingStartTime, setRecordingStartTime] = useState(null);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -30,8 +31,27 @@ function VoiceNavigationMode({ isActive, onClose, onNavigate }) {
   useEffect(() => {
     if (!isActive) return;
 
-    // Start with greeting
-    speakGreeting();
+    // Check if resuming from pause
+    const savedState = sessionStorage.getItem('voiceNavState');
+    if (savedState) {
+      try {
+        const state = JSON.parse(savedState);
+        setConversationHistory(state.history || []);
+        setIsPaused(state.isPaused || false);
+        
+        // If not paused, resume with greeting
+        if (!state.isPaused) {
+          speak("Welcome back! What would you like to do?");
+          addToHistory('AI', "Welcome back! What would you like to do?");
+        }
+      } catch (e) {
+        console.error('[VoiceNav] Error restoring state:', e);
+        speakGreeting();
+      }
+    } else {
+      // Start with greeting for new session
+      speakGreeting();
+    }
 
     return () => {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
@@ -62,6 +82,11 @@ function VoiceNavigationMode({ isActive, onClose, onNavigate }) {
 
   // Start/Stop listening
   const toggleListening = async () => {
+    if (isPaused) {
+      speak("Please resume voice navigation first.");
+      return;
+    }
+    
     if (isListening) {
       // Stop recording and process
       stopRecording();
@@ -217,9 +242,63 @@ function VoiceNavigationMode({ isActive, onClose, onNavigate }) {
     }, 30000); // 30 seconds
   };
 
+  // Toggle pause/resume
+  const togglePause = () => {
+    const newPausedState = !isPaused;
+    setIsPaused(newPausedState);
+    
+    if (newPausedState) {
+      // Pausing - stop any ongoing speech and recording
+      if (synthRef.current) {
+        try {
+          synthRef.current.cancel();
+        } catch (e) {
+          console.warn('[VoiceNav] Could not cancel speech on pause:', e);
+        }
+      }
+      setIsSpeaking(false);
+      
+      if (isListening) {
+        stopRecording();
+      }
+      
+      speak("Voice navigation paused. Click play to resume.");
+      addToHistory('AI', "Voice navigation paused.");
+    } else {
+      // Resuming
+      speak("Resuming voice navigation. What would you like to do?");
+      addToHistory('AI', "Resuming voice navigation. What would you like to do?");
+    }
+  };
+
+  // Save state when closing
+  const handleClose = () => {
+    // Save current state to session storage
+    const state = {
+      history: conversationHistory,
+      isPaused: true,
+      timestamp: Date.now()
+    };
+    sessionStorage.setItem('voiceNavState', JSON.stringify(state));
+    
+    // Stop any ongoing operations
+    if (synthRef.current) {
+      try {
+        synthRef.current.cancel();
+      } catch (e) {
+        console.warn('[VoiceNav] Could not cancel speech on close:', e);
+      }
+    }
+    if (isListening) {
+      stopRecording();
+    }
+    
+    onClose();
+  };
+
   // Text-to-Speech
   const speak = (text) => {
-    if (isMuted) return;
+    if (isMuted || isPaused) return;
 
     // Check if speech synthesis is available
     if (!synthRef.current) {
@@ -248,8 +327,8 @@ function VoiceNavigationMode({ isActive, onClose, onNavigate }) {
 
     utterance.onend = () => {
       setIsSpeaking(false);
-      // Auto-start listening after AI finishes speaking
-      if (isActive && !isListening && !isProcessing) {
+      // Auto-start listening after AI finishes speaking (only if not paused)
+      if (isActive && !isListening && !isProcessing && !isPaused) {
         setTimeout(() => {
           startRecording();
         }, 800);
@@ -358,11 +437,20 @@ function VoiceNavigationMode({ isActive, onClose, onNavigate }) {
             <div>
               <h2 className="text-xl font-bold">🎙️ Voice Navigation Mode</h2>
               <p className="text-sm text-muted-foreground">
-                {isSpeaking ? '🔊 AI is speaking...' : isListening ? '👂 Listening...' : '⏸️ Paused'}
+                {isPaused ? '⏸️ Paused' : isSpeaking ? '🔊 AI is speaking...' : isListening ? '👂 Listening...' : '✅ Ready'}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={togglePause}
+              className={`p-2 hover:bg-secondary rounded-lg transition-colors ${
+                isPaused ? 'bg-yellow-500/20' : ''
+              }`}
+              title={isPaused ? 'Resume' : 'Pause'}
+            >
+              {isPaused ? <Play size={20} /> : <Pause size={20} />}
+            </button>
             <button
               onClick={toggleMute}
               className="p-2 hover:bg-secondary rounded-lg transition-colors"
@@ -371,7 +459,7 @@ function VoiceNavigationMode({ isActive, onClose, onNavigate }) {
               {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
             </button>
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="p-2 hover:bg-destructive/20 rounded-lg transition-colors"
               title="Close"
             >
@@ -430,7 +518,12 @@ function VoiceNavigationMode({ isActive, onClose, onNavigate }) {
         <div className="p-3 border-t border-border bg-secondary/30">
           <div className="flex items-center justify-between">
             <div className="text-sm text-muted-foreground">
-              {isListening ? (
+              {isPaused ? (
+                <span className="flex items-center gap-2 text-yellow-600">
+                  <Pause size={14} />
+                  Paused - Click play button to resume
+                </span>
+              ) : isListening ? (
                 <span className="flex items-center gap-2">
                   <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
                   Recording... ({recordingDuration}s / 60s) - Click mic to stop
@@ -441,12 +534,15 @@ function VoiceNavigationMode({ isActive, onClose, onNavigate }) {
             </div>
             <button
               onClick={toggleListening}
+              disabled={isPaused}
               className={`p-4 rounded-full transition-all ${
                 isListening
                   ? 'bg-red-500 hover:bg-red-600 animate-pulse'
+                  : isPaused
+                  ? 'bg-gray-400 cursor-not-allowed'
                   : 'bg-primary hover:bg-primary/80'
               }`}
-              title={isListening ? 'Stop listening' : 'Start listening'}
+              title={isPaused ? 'Resume first' : isListening ? 'Stop listening' : 'Start listening'}
             >
               {isListening ? <MicOff className="text-white" size={28} /> : <Mic className="text-white" size={28} />}
             </button>

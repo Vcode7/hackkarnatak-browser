@@ -8,8 +8,10 @@ export function BrowserProvider({ children }) {
   ])
   const [activeTabId, setActiveTabId] = useState(1)
   const [nextTabId, setNextTabId] = useState(2)
+  const [webviewRefs, setWebviewRefs] = useState({})
 
   const activeTab = tabs.find(tab => tab.id === activeTabId)
+  const activeTabWithWebview = activeTab ? { ...activeTab, webview: webviewRefs[activeTabId] } : null
 
   const addTab = useCallback((url = '') => {
     const newTab = {
@@ -117,9 +119,21 @@ export function BrowserProvider({ children }) {
     ))
   }, [activeTab, activeTabId])
 
+  const registerWebview = useCallback((tabId, webviewElement) => {
+    setWebviewRefs(prev => ({ ...prev, [tabId]: webviewElement }))
+  }, [])
+
+  const unregisterWebview = useCallback((tabId) => {
+    setWebviewRefs(prev => {
+      const newRefs = { ...prev }
+      delete newRefs[tabId]
+      return newRefs
+    })
+  }, [])
+
   const value = {
     tabs,
-    activeTab,
+    activeTab: activeTabWithWebview,
     activeTabId,
     addTab,
     closeTab,
@@ -129,6 +143,8 @@ export function BrowserProvider({ children }) {
     navigateBack,
     navigateForward,
     refresh,
+    registerWebview,
+    unregisterWebview,
     canGoBack: activeTab?.historyIndex > 0,
     canGoForward: activeTab?.historyIndex < (activeTab?.history.length - 1)
   }

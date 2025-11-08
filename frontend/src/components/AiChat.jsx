@@ -3,6 +3,8 @@ import { MessageCircle, X, Send, Mic, Loader2, Volume2, VolumeX } from 'lucide-r
 import { useBrowser } from '../context/BrowserContext'
 import { isCapacitor, isElectron } from '../utils/platform'
 import axios from 'axios'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -21,8 +23,11 @@ export default function AiChat() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [transcribingText, setTranscribingText] = useState('')
   const [recordingMode, setRecordingMode] = useState(null) // 'tap' or 'hold'
+  const [typingMessageIndex, setTypingMessageIndex] = useState(null)
+  const [displayedContent, setDisplayedContent] = useState('')
 
   const messagesEndRef = useRef(null)
+  const typingIntervalRef = useRef(null)
   const mediaRecorderRef = useRef(null)
   const audioChunksRef = useRef([])
   const recordingTimerRef = useRef(null)
@@ -70,17 +75,24 @@ export default function AiChat() {
 
 
   const getPageContent = async () => {
+    console.log('[AiChat] Getting page content...');
+    console.log('[AiChat] Active tab:', activeTab);
+    
     // Check if we have an active tab with a URL
     if (!activeTab?.url || activeTab.url === '') {
+      console.log('[AiChat] No URL in active tab');
       return "No active page loaded. Currently on home page.";
     }
 
     // Check if webview is available
     if (!activeTab?.webview) {
-      return `Current page: ${activeTab?.url || 'No page loaded'} (content not accessible)`;
+      console.warn('[AiChat] Webview not available for tab:', activeTab.id);
+      console.log('[AiChat] Active tab object:', JSON.stringify(activeTab, null, 2));
+      return `Current page: ${activeTab?.url || 'No page loaded'} (content not accessible - webview not loaded yet)`;
     }
 
     try {
+      console.log('[AiChat] Executing JavaScript in webview...');
       // Evaluate JavaScript inside the webview to get page text
       const pageText = await activeTab.webview.executeJavaScript(`
         (function() {
@@ -101,15 +113,15 @@ export default function AiChat() {
 
       const parsed = JSON.parse(pageText);
       if (parsed.error) {
-        console.error('Error in webview script:', parsed.error);
-        return `Current page: ${activeTab?.url} (content extraction failed)`;
+        console.error('[AiChat] Error in webview script:', parsed.error);
+        return `Current page: ${activeTab?.url} (content extraction failed: ${parsed.error})`;
       }
 
       const result = `Current page: ${parsed.title}\nURL: ${activeTab.url}\n${parsed.description ? 'Description: ' + parsed.description + '\n' : ''}\nContent:\n${parsed.content}`;
-      console.log('Page content extracted:', result.slice(0, 200) + '...');
+      console.log('[AiChat] Page content extracted successfully:', result.slice(0, 200) + '...');
       return result;
     } catch (error) {
-      console.error('Error extracting page content:', error);
+      console.error('[AiChat] Error extracting page content:', error);
       return `Current page: ${activeTab?.url || 'No page loaded'} (error: ${error.message})`;
     }
   };
@@ -141,14 +153,22 @@ export default function AiChat() {
       const assistantMessage = {
         role: 'assistant',
         content: response.data.text,
-        audio: response.data.audio_base64
+        audio: response.data.audio_base64,
+        isTyping: true
       }
 
       setMessages(prev => [...prev, assistantMessage])
+      
+      // Start typing animation
+      const messageIndex = messages.length + 1 // +1 for the user message already added
+      startTypingAnimation(messageIndex, response.data.text)
 
-      // Auto-play audio if available
+      // Auto-play audio if available (delay until typing is complete)
       if (response.data.audio_base64) {
-        playAudio(response.data.audio_base64)
+        const typingDuration = response.data.text.length * 20
+        setTimeout(() => {
+          playAudio(response.data.audio_base64)
+        }, typingDuration)
       }
     } catch (error) {
       console.error('Error sending message:', error)
@@ -179,13 +199,22 @@ export default function AiChat() {
       const assistantMessage = {
         role: 'assistant',
         content: response.data.text,
-        audio: response.data.audio_base64
+        audio: response.data.audio_base64,
+        isTyping: true
       }
 
       setMessages(prev => [...prev, assistantMessage])
+      
+      // Start typing animation
+      const messageIndex = messages.length + 1 // +1 for the user message already added
+      startTypingAnimation(messageIndex, response.data.text)
 
       if (response.data.audio_base64) {
-        playAudio(response.data.audio_base64)
+        // Delay audio until typing is complete
+        const typingDuration = response.data.text.length * 20
+        setTimeout(() => {
+          playAudio(response.data.audio_base64)
+        }, typingDuration)
       }
     } catch (error) {
       console.error('Error summarizing:', error)
@@ -393,6 +422,44 @@ export default function AiChat() {
     }
   }
 
+  // Typing animation effect
+  const startTypingAnimation = (messageIndex, fullText) => {
+    setTypingMessageIndex(messageIndex)
+    setDisplayedContent('')
+    
+    let currentIndex = 0
+    const typingSpeed = 20 // milliseconds per character
+    
+    if (typingIntervalRef.current) {
+      clearInterval(typingIntervalRef.current)
+    }
+    
+    typingIntervalRef.current = setInterval(() => {
+      if (currentIndex < fullText.length) {
+        setDisplayedContent(fullText.slice(0, currentIndex + 1))
+        currentIndex++
+      } else {
+        clearInterval(typingIntervalRef.current)
+        setTypingMessageIndex(null)
+        setDisplayedContent('')
+        
+        // Mark message as no longer typing
+        setMessages(prev => prev.map((msg, idx) => 
+          idx === messageIndex ? { ...msg, isTyping: false } : msg
+        ))
+      }
+    }, typingSpeed)
+  }
+
+  // Cleanup typing animation on unmount
+  useEffect(() => {
+    return () => {
+      if (typingIntervalRef.current) {
+        clearInterval(typingIntervalRef.current)
+      }
+    }
+  }, [])
+
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -466,7 +533,30 @@ export default function AiChat() {
                   <span>Voice transcription</span>
                 </div>
               )}
-              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              <div className="text-sm prose prose-sm max-w-none dark:prose-invert prose-p:my-2 prose-pre:my-3 prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-headings:my-3 prose-a:text-blue-500 hover:prose-a:text-blue-600">
+                <ReactMarkdown 
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    p: ({node, ...props}) => <p className="mb-3 leading-relaxed" {...props} />,
+                    ul: ({node, ...props}) => <ul className="mb-3 ml-4 space-y-1" {...props} />,
+                    ol: ({node, ...props}) => <ol className="mb-3 ml-4 space-y-1" {...props} />,
+                    li: ({node, ...props}) => <li className="leading-relaxed" {...props} />,
+                    a: ({node, ...props}) => <a className="underline" target="_blank" rel="noopener noreferrer" {...props} />,
+                    code: ({node, inline, ...props}) => 
+                      inline ? 
+                        <code className="bg-muted px-1.5 py-0.5 rounded text-xs" {...props} /> : 
+                        <code className="block bg-muted p-3 rounded-lg my-2 overflow-x-auto" {...props} />,
+                    h1: ({node, ...props}) => <h1 className="text-xl font-bold mb-2 mt-4" {...props} />,
+                    h2: ({node, ...props}) => <h2 className="text-lg font-bold mb-2 mt-3" {...props} />,
+                    h3: ({node, ...props}) => <h3 className="text-base font-bold mb-2 mt-3" {...props} />,
+                  }}
+                >
+                  {typingMessageIndex === index && message.isTyping ? displayedContent : message.content}
+                </ReactMarkdown>
+                {typingMessageIndex === index && message.isTyping && (
+                  <span className="inline-block w-1 h-4 bg-current animate-pulse ml-0.5"></span>
+                )}
+              </div>
               {message.audio && (
                 <button
                   onClick={() => playAudio(message.audio)}
