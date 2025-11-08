@@ -7,6 +7,16 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true
+});
+
+// Add request interceptor for auth
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('session_token');
+  if (token) {
+    config.headers['Authorization'] = `Bearer ${token}`;
+  }
+  return config;
 });
 
 export interface ChatRequest {
@@ -21,10 +31,20 @@ export interface ChatResponse {
 }
 
 export const sendMessage = async (message: string, conversationId?: string): Promise<ChatResponse> => {
-  const response = await api.post<ChatResponse>('/api/chat', {
+  const response = await api.post<ChatResponse>('/api/ai/chat', {
     message,
     conversation_id: conversationId,
   });
+  return response.data;
+};
+
+export const checkFocusMode = async (url: string) => {
+  const response = await api.post('/api/focus/check', { url });
+  return response.data;
+};
+
+export const getDownloads = async () => {
+  const response = await api.get('/api/downloads');
   return response.data;
 };
 
