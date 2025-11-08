@@ -3,6 +3,8 @@ import { useBrowser } from '../context/BrowserContext'
 import { useTheme } from '../context/ThemeContext'
 import { useAuth } from '../context/AuthContext'
 import { isElectron, isCapacitor } from '../utils/platform'
+import FocusMode from './FocusMode'
+import FocusBlockedPage from './FocusBlockedPage'
 import axios from 'axios'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -31,6 +33,10 @@ export default function Browser() {
   const [isLoading, setIsLoading] = useState(false)
   const [searchEngine, setSearchEngine] = useState('google')
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [focusModeActive, setFocusModeActive] = useState(false)
+  const [blockedUrl, setBlockedUrl] = useState<string | null>(null)
+  const [blockReason, setBlockReason] = useState('')
+  const [focusTopic, setFocusTopic] = useState('')
 
   useEffect(() => {
     setUrlInput(activeTab?.url || '')
@@ -98,6 +104,32 @@ export default function Browser() {
     return searchEngines[searchEngine] || searchEngines.google
   }
 
+  const checkUrlWithFocusMode = async (url: string) => {
+    if (!focusModeActive) return true
+    
+    try {
+      const response = await axios.post(`${API_URL}/api/focus/check-url`, {
+        url: url,
+        use_quick_check: false
+      })
+
+      if (response.data.allowed) {
+        setBlockedUrl(null)
+        setBlockReason('')
+        return true
+      } else {
+        setBlockedUrl(url)
+        setBlockReason(response.data.reason || 'This URL is not relevant to your focus topic')
+        setFocusTopic(response.data.topic || '')
+        return false
+      }
+    } catch (error) {
+      console.error('Error checking URL with focus mode:', error)
+      // On error, allow the URL (fail open)
+      return true
+    }
+  }
+
   const handleUrlSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     let url = urlInput.trim()
@@ -118,6 +150,14 @@ export default function Browser() {
       }
     }
 
+    // Check with focus mode if active
+    if (focusModeActive) {
+      const allowed = await checkUrlWithFocusMode(url)
+      if (!allowed) {
+        return // URL was blocked
+      }
+    }
+
     updateTabUrl(activeTabId, url)
   }
 
@@ -127,9 +167,44 @@ export default function Browser() {
     setUrlInput('')
   }
 
-  const handleHomePageNavigate = (url: string) => {
+  const handleHomePageNavigate = async (url: string) => {
+    // Check with focus mode if active
+    if (focusModeActive) {
+      const allowed = await checkUrlWithFocusMode(url)
+      if (!allowed) {
+        return
+      }
+    }
     updateTabUrl(activeTabId, url)
     setUrlInput(url)
+  }
+
+  const handleFocusModeChange = (active: boolean) => {
+    setFocusModeActive(active)
+    if (!active) {
+      // Clear any blocks when focus mode is disabled
+      setBlockedUrl(null)
+      setBlockReason('')
+      setFocusTopic('')
+    }
+  }
+
+  const handleGoBack = () => {
+    setBlockedUrl(null)
+    setBlockReason('')
+    navigateBack()
+  }
+
+  const handleEndFocusFromBlock = async () => {
+    try {
+      await axios.post(`${API_URL}/api/focus/end`)
+      setFocusModeActive(false)
+      setBlockedUrl(null)
+      setBlockReason('')
+      setFocusTopic('')
+    } catch (error) {
+      console.error('Error ending focus session:', error)
+    }
   }
 
   const handleLoadStop = () => {
@@ -283,59 +358,75 @@ export default function Browser() {
       <div className="flex-1 relative bg-gray-900">
         {activeTab && (
           <>
-            {/* Show home page if no URL, otherwise show webview */}
-            {!activeTab.url || activeTab.url === '' ? (
-              <div className="flex items-center justify-center h-full bg-gray-900">
-                <div className="text-center p-8">
-                  <h1 className="text-2xl font-bold text-gray-100 mb-4">GenAI Browser</h1>
-                  <p className="text-gray-400 mb-4">Enter a URL or search term to get started</p>
-                  <div className="flex flex-wrap gap-2 justify-center">
-                    <button
-                      onClick={() => handleHomePageNavigate('https://www.google.com')}
-                      className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                    >
-                      Google
-                    </button>
-                    <button
-                      onClick={() => handleHomePageNavigate('https://github.com')}
-                      className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                    >
-                      GitHub
-                    </button>
-                    <button
-                      onClick={() => handleHomePageNavigate('https://stackoverflow.com')}
-                      className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                    >
-                      Stack Overflow
-                    </button>
-                  </div>
-                </div>
-              </div>
+            {/* Show blocked page if URL is blocked by focus mode */}
+            {blockedUrl ? (
+              <FocusBlockedPage
+                url={blockedUrl}
+                reason={blockReason}
+                topic={focusTopic}
+                onGoBack={handleGoBack}
+                onEndFocus={handleEndFocusFromBlock}
+              />
             ) : (
               <>
-                {/* Platform-specific rendering - Use iframe for cross-platform */}
-                {isElectron() || isCapacitor() ? (
-                  // Use iframe for both Electron and Capacitor
-                  <iframe
-                    key={activeTab.id}
-                    src={activeTab.url}
-                    className="w-full h-full border-0 bg-white"
-                    title={activeTab.title || 'Browser'}
-                    sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-top-navigation"
-                    onLoad={() => {
-                      handleLoadStop()
-                    }}
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full">
-                    <p className="text-gray-500">Please use the desktop or mobile app</p>
+                {/* Show home page if no URL, otherwise show webview */}
+                {!activeTab.url || activeTab.url === '' ? (
+                  <div className="flex items-center justify-center h-full bg-gray-900">
+                    <div className="text-center p-8">
+                      <h1 className="text-2xl font-bold text-gray-100 mb-4">GenAI Browser</h1>
+                      <p className="text-gray-400 mb-4">Enter a URL or search term to get started</p>
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        <button
+                          onClick={() => handleHomePageNavigate('https://www.google.com')}
+                          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                        >
+                          Google
+                        </button>
+                        <button
+                          onClick={() => handleHomePageNavigate('https://github.com')}
+                          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                        >
+                          GitHub
+                        </button>
+                        <button
+                          onClick={() => handleHomePageNavigate('https://stackoverflow.com')}
+                          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                        >
+                          Stack Overflow
+                        </button>
+                      </div>
+                    </div>
                   </div>
+                ) : (
+                  <>
+                    {/* Platform-specific rendering - Use iframe for cross-platform */}
+                    {isElectron() || isCapacitor() ? (
+                      // Use iframe for both Electron and Capacitor
+                      <iframe
+                        key={activeTab.id}
+                        src={activeTab.url}
+                        className="w-full h-full border-0 bg-white"
+                        title={activeTab.title || 'Browser'}
+                        sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-top-navigation"
+                        onLoad={() => {
+                          handleLoadStop()
+                        }}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-full">
+                        <p className="text-gray-500">Please use the desktop or mobile app</p>
+                      </div>
+                    )}
+                  </>
                 )}
               </>
             )}
           </>
         )}
       </div>
+
+      {/* Focus Mode Component */}
+      <FocusMode onUrlCheck={handleFocusModeChange} />
     </div>
   )
 }

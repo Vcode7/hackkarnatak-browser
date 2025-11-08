@@ -1,0 +1,46 @@
+{
+  "name": "genai-browser",
+  "version": "1.0.0",
+  "description": "GenAI Browser - Cross-platform application with React, Electron, and Capacitor",
+  "main": "frontend/electron/main.js",
+  "scripts": {
+    "dev": "cd frontend && vite",
+    "build": "cd frontend && vite build",
+    "build:web": "cd frontend && vite build",
+    "preview": "cd frontend && vite preview",
+    "dev:electron": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron frontend/electron/main.js\"",
+    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron frontend/electron/main.js\"",
+    "electron:build": "npm run build:web && electron-builder",
+    "cap:sync": "cd frontend && capacitor sync",
+    "cap:ios": "cd frontend && capacitor sync ios && npx cap open ios",
+    "cap:android": "cd frontend && capacitor sync android && npx cap open android",
+    "backend:dev": "cd backend && uvicorn main:app --reload --host 0.0.0.0 --port 8000"
+  },
+  "keywords": ["genai", "browser", "react", "electron", "capacitor"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.20.0",
+    "axios": "^1.6.2"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^5.5.1",
+    "@capacitor/cli": "^5.5.1",
+    "@capacitor/core": "^5.5.1",
+    "@capacitor/ios": "^5.5.1",
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.16",
+    "concurrently": "^8.2.2",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.8",
+    "wait-on": "^7.2.0"
+  }
+}
