@@ -14,16 +14,18 @@ export function BrowserProvider({ children }) {
   const activeTabWithWebview = activeTab ? { ...activeTab, webview: webviewRefs[activeTabId] } : null
 
   const addTab = useCallback((url = '') => {
+    const newTabId = nextTabId
     const newTab = {
-      id: nextTabId,
+      id: newTabId,
       url,
       title: 'New Tab',
       history: url ? [url] : [],
       historyIndex: url ? 0 : -1
     }
     setTabs(prev => [...prev, newTab])
-    setActiveTabId(nextTabId)
+    setActiveTabId(newTabId)
     setNextTabId(prev => prev + 1)
+    return newTabId // Return the new tab ID
   }, [nextTabId])
 
   const closeTab = useCallback((tabId) => {

@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 import logging
 
 from database.mongodb import connect_to_mongo, close_mongo_connection
-from routes import ai, voice, browser, proxy, data, focus, auth, downloads, voice_navigation, vector_storage, notes, quiz
+from routes import ai, voice, browser, proxy, data, focus, auth, downloads, voice_navigation, vector_storage, notes, quiz, document_parser
 
 # Load environment variables
 
@@ -60,6 +60,7 @@ app.include_router(downloads.router, prefix="/api", tags=["Downloads"])
 app.include_router(vector_storage.router, prefix="/api/vector", tags=["Vector Storage"])
 app.include_router(notes.router, prefix="/api", tags=["Notes"])
 app.include_router(quiz.router, prefix="/api", tags=["Quiz"])
+app.include_router(document_parser.router, prefix="/api", tags=["Document Parser"])
 
 @app.get("/")
 async def root():

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { MessageCircle, X, Send, Mic, Loader2, Volume2, VolumeX } from 'lucide-react'
+import { MessageCircle, X, Send, Mic, Loader2, Volume2, VolumeX, Maximize2 } from 'lucide-react'
 import { useBrowser } from '../context/BrowserContext'
 import { isCapacitor, isElectron } from '../utils/platform'
 import axios from 'axios'
@@ -100,6 +100,97 @@ export default function AiChat() {
     if (!activeTab?.url || activeTab.url === '') {
       console.log('[AiChat] No URL in active tab');
       return "No active page loaded. Currently on home page.";
+    }
+
+    // Check if URL is a document (PDF, DOCX, XLSX)
+    const url = activeTab.url.toLowerCase();
+    const isDocument = url.endsWith('.pdf') || 
+                      url.endsWith('.docx') || 
+                      url.endsWith('.doc') || 
+                      url.endsWith('.xlsx') || 
+                      url.endsWith('.xls') ||
+                      url.includes('/pdf/') ||
+                      url.includes('docs.google.com/document') ||
+                      url.includes('docs.google.com/spreadsheets');
+    
+    if (isDocument) {
+      console.log('[AiChat] Detected document URL, parsing...');
+      
+      // Show parsing message
+      const parsingMsg = document.createElement('div');
+      parsingMsg.id = 'doc-parsing-indicator';
+      parsingMsg.style.cssText = `
+        position: fixed;
+        bottom: 80px;
+        right: 20px;
+        background: #3b82f6;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        z-index: 10000;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      `;
+      parsingMsg.innerHTML = `
+        <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+        <span>📄 Parsing document...</span>
+      `;
+      document.body.appendChild(parsingMsg);
+      
+      try {
+        const response = await axios.post(`${API_URL}/api/document/parse`, {
+          url: activeTab.url
+        });
+        
+        // Remove parsing indicator
+        document.getElementById('doc-parsing-indicator')?.remove();
+        
+        if (response.data.success) {
+          console.log(`[AiChat] Successfully parsed ${response.data.doc_type.toUpperCase()}`);
+          
+          // Show success message
+          const successMsg = document.createElement('div');
+          successMsg.style.cssText = parsingMsg.style.cssText.replace('#3b82f6', '#10b981');
+          
+          if (response.data.is_truncated) {
+            successMsg.innerHTML = `<span>✅ Document parsed (large file - showing key sections)</span>`;
+            console.log(`[AiChat] Document truncated: ${response.data.total_length} chars -> ${response.data.content.length} chars`);
+          } else {
+            successMsg.innerHTML = `<span>✅ Document parsed successfully!</span>`;
+          }
+          
+          document.body.appendChild(successMsg);
+          setTimeout(() => successMsg.remove(), 3000);
+          
+          let result = `Document: ${response.data.title}\nType: ${response.data.doc_type.toUpperCase()}\nURL: ${activeTab.url}\n`;
+          
+          if (response.data.is_truncated) {
+            result += `\n⚠️ Note: This is a large document (${response.data.total_length} characters). Showing key sections for context.\n`;
+          }
+          
+          result += `\nContent:\n${response.data.content}`;
+          
+          // Store in vector database (full content is already stored by backend)
+          storePageInVector(activeTab.url, response.data.title, response.data.content, `${response.data.doc_type} document`);
+          
+          return result;
+        }
+      } catch (error) {
+        console.error('[AiChat] Error parsing document:', error);
+        document.getElementById('doc-parsing-indicator')?.remove();
+        
+        // Show error message
+        const errorMsg = document.createElement('div');
+        errorMsg.style.cssText = parsingMsg.style.cssText.replace('#3b82f6', '#ef4444');
+        errorMsg.innerHTML = `<span>⚠️ Could not parse document</span>`;
+        document.body.appendChild(errorMsg);
+        setTimeout(() => errorMsg.remove(), 3000);
+        
+        // Fall through to regular page extraction
+      }
     }
 
     // Check if webview is available
@@ -490,6 +581,22 @@ export default function AiChat() {
     }
   }
 
+  const handleOpenFullScreen = () => {
+    // Save current chat state to localStorage
+    localStorage.setItem('aiChatMessages', JSON.stringify(messages))
+    localStorage.setItem('aiChatContext', JSON.stringify({
+      activeTabUrl: activeTab?.url,
+      timestamp: Date.now()
+    }))
+    
+    // Dispatch event to open in new tab
+    const event = new CustomEvent('open-ai-chat-fullscreen')
+    window.dispatchEvent(event)
+    
+    // Close the popup
+    setIsOpen(false)
+  }
+
 
 
   if (!isOpen) {
@@ -524,6 +631,13 @@ export default function AiChat() {
               <VolumeX size={18} />
             </button>
           )}
+          <button
+            onClick={handleOpenFullScreen}
+            className="p-1 hover:bg-primary-foreground/20 rounded"
+            title="Open in Full Screen"
+          >
+            <Maximize2 size={18} />
+          </button>
           <button
             onClick={() => setIsOpen(false)}
             className="p-1 hover:bg-primary-foreground/20 rounded"

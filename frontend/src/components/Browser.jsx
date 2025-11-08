@@ -33,6 +33,7 @@ import HighlightImportant from './HighlightImportant'
 import MobileBottomBar from './MobileBottomBar'
 import Notes from './Notes'
 import HistoryQuiz from './HistoryQuiz'
+import AiChatFullScreen from './AiChatFullScreen'
 import axios from 'axios'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -185,12 +186,35 @@ export default function Browser() {
       }
     }
 
+    // Listen for fullscreen AI chat request
+    const handleOpenAiChatFullscreen = () => {
+      // Open AI chat in a new tab
+      const newTabId = addTab('/ai-chat-fullscreen')
+      // Set the title for the AI chat tab
+      setTimeout(() => {
+        updateTabTitle(newTabId, '🤖 AI Chat')
+      }, 100)
+    }
+
+    // Listen for close AI chat tab request
+    const handleCloseAiChatTab = () => {
+      // Find and close the AI chat tab
+      const aiChatTab = tabs.find(tab => tab.url === '/ai-chat-fullscreen')
+      if (aiChatTab) {
+        closeTab(aiChatTab.id)
+      }
+    }
+
     window.addEventListener('navigate-to-url', handleNavigateToUrl)
+    window.addEventListener('open-ai-chat-fullscreen', handleOpenAiChatFullscreen)
+    window.addEventListener('close-ai-chat-tab', handleCloseAiChatTab)
 
     return () => {
       window.removeEventListener('navigate-to-url', handleNavigateToUrl)
+      window.removeEventListener('open-ai-chat-fullscreen', handleOpenAiChatFullscreen)
+      window.removeEventListener('close-ai-chat-tab', handleCloseAiChatTab)
     }
-  }, [activeTabId, updateTabUrl, addTab])
+  }, [activeTabId, updateTabUrl, addTab, tabs, closeTab])
 
   // Load settings function (defined outside useEffect so it can be called from multiple places)
   const loadSettings = async () => {
@@ -562,6 +586,8 @@ export default function Browser() {
                 {/* Show home page if no URL, otherwise show webview */}
                 {!activeTab.url || activeTab.url === '' ? (
                   <HomePage onNavigate={handleHomePageNavigate} />
+                ) : activeTab.url === '/ai-chat-fullscreen' ? (
+                  <AiChatFullScreen />
                 ) : (
                   <>
                     {/* Platform-specific rendering - Use webview for both Electron and Capacitor */}
