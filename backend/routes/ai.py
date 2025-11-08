@@ -79,6 +79,12 @@ class HighlightRequest(BaseModel):
     pageUrl: str
     elements: List[Dict]
 
+class ChatRequest(BaseModel):
+    query: str
+    context: str = ""
+    page_url: Optional[str] = None
+    group_id: Optional[str] = None
+
 class WebsiteSuggestionRequest(BaseModel):
     topic: str
 
@@ -392,6 +398,90 @@ Provide real, working URLs for popular educational websites. Your response (JSON
         logger.error(f"AI website suggestion error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@router.post("/ai/chat")
+async def ai_chat_with_group_context(request: ChatRequest):
+    """AI chat endpoint with optional group context support"""
+    try:
+        from database.mongodb import get_database
+        from bson import ObjectId
+        
+        # Start with the provided context
+        enhanced_context = request.context or ""
+        
+        # If group_id is provided, fetch shared context from the group
+        if request.group_id:
+            logger.info(f"Fetching shared context for group: {request.group_id}")
+            
+            try:
+                db = get_database()
+                
+                # Get all shared contexts from the group (limit to recent 20)
+                contexts = await db.shared_contexts.find({
+                    "group_id": request.group_id
+                }).sort("timestamp", -1).limit(20).to_list(length=20)
+                
+                if contexts:
+                    logger.info(f"Found {len(contexts)} shared contexts in group")
+                    
+                    # Build group context string
+                    group_context = "\n\n--- Shared Context from Group Members ---\n"
+                    
+                    for ctx in contexts:
+                        group_context += f"\n[{ctx['user_name']}] {ctx['page_title']}\n"
+                        group_context += f"URL: {ctx['page_url']}\n"
+                        if ctx.get('search_query'):
+                            group_context += f"Searched for: {ctx['search_query']}\n"
+                        # Add truncated content (first 300 chars)
+                        content_preview = ctx['content'][:300] + "..." if len(ctx['content']) > 300 else ctx['content']
+                        group_context += f"Content: {content_preview}\n"
+                        group_context += f"---\n"
+                    
+                    enhanced_context = group_context + "\n\n" + enhanced_context
+            except Exception as group_error:
+                logger.error(f"Error fetching group context: {group_error}")
+                # Continue without group context
+        
+        # Query vector store for relevant context from browsing history
+        relevant_chunks = await vector_store.query_relevant_content(
+            query=request.query,
+            n_results=3
+        )
+        
+        if relevant_chunks:
+            logger.info(f"Found {len(relevant_chunks)} relevant chunks from browsing history")
+            vector_context = "\n\n--- Relevant information from your browsing history ---\n"
+            
+            for i, chunk in enumerate(relevant_chunks, 1):
+                metadata = chunk['metadata']
+                vector_context += f"\n[Source {i}] {metadata['title']} ({metadata['url']})\n"
+                vector_context += f"Content: {chunk['content'][:400]}...\n"
+            
+            enhanced_context = vector_context + "\n\n" + enhanced_context
+        
+        # Generate text response with enhanced context
+        text_response = await langchain_service.general_chat(
+            query=request.query,
+            context=enhanced_context
+        )
+        
+        # Generate voice response (optional)
+        audio_base64 = None
+        try:
+            audio_base64 = await eleven_labs_client.text_to_speech(text_response)
+        except Exception as tts_error:
+            logger.warning(f"TTS generation failed: {tts_error}")
+        
+        return {
+            "success": True,
+            "text": text_response,
+            "audio_base64": audio_base64,
+            "used_group_context": bool(request.group_id)
+        }
+        
+    except Exception as e:
+        logger.error(f"AI chat error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/highlight-important")
 async def highlight_important(request: HighlightRequest):

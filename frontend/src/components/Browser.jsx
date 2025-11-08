@@ -34,6 +34,7 @@ import MobileBottomBar from './MobileBottomBar'
 import Notes from './Notes'
 import HistoryQuiz from './HistoryQuiz'
 import AiChatFullScreen from './AiChatFullScreen'
+import GroupContext from './GroupContext'
 import axios from 'axios'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -75,6 +76,7 @@ export default function Browser() {
   const [isVoiceNavActive, setIsVoiceNavActive] = useState(false)
   const [isNotesOpen, setIsNotesOpen] = useState(false)
   const [isQuizOpen, setIsQuizOpen] = useState(false)
+  const [isGroupContextOpen, setIsGroupContextOpen] = useState(false)
   const webviewRef = useRef(null)
 
   // Register webview when it changes
@@ -643,6 +645,7 @@ export default function Browser() {
         }}
         onNotesClick={() => setIsNotesOpen(true)}
         onQuizClick={() => setIsQuizOpen(true)}
+        onGroupContextClick={() => setIsGroupContextOpen(true)}
       />
 
       {/* Downloads Modal */}
@@ -675,6 +678,12 @@ export default function Browser() {
       <HistoryQuiz 
         isOpen={isQuizOpen} 
         onClose={() => setIsQuizOpen(false)} 
+      />
+
+      {/* Group Context Modal */}
+      <GroupContext 
+        isOpen={isGroupContextOpen} 
+        onClose={() => setIsGroupContextOpen(false)} 
       />
 
       {/* Mobile Bottom Bar - Only show on Capacitor */}

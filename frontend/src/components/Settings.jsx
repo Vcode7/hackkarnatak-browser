@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
-import { X, Save, Trash2, Search, Bookmark, Clock, Globe, Shield, Palette, Zap, Database, StickyNote, Brain } from 'lucide-react'
+import { X, Save, Trash2, Search, Bookmark, Clock, Globe, Shield, Palette, Zap, Database, StickyNote, Brain, Users } from 'lucide-react'
 import axios from 'axios'
 import { isCapacitor } from '../utils/platform'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
-export default function Settings({ isOpen, onClose, onNotesClick, onQuizClick }) {
+export default function Settings({ isOpen, onClose, onNotesClick, onQuizClick, onGroupContextClick }) {
   const [activeTab, setActiveTab] = useState('general')
   const [settings, setSettings] = useState(null)
   const [bookmarks, setBookmarks] = useState([])
@@ -258,6 +258,18 @@ export default function Settings({ isOpen, onClose, onNotesClick, onQuizClick })
             >
               <Brain size={isCapacitor() ? 18 : 20} />
               {!isCapacitor() && <span>History Quiz</span>}
+            </button>
+            
+            <button
+              onClick={() => {
+                onClose()
+                if (onGroupContextClick) onGroupContextClick()
+              }}
+              className={`w-full flex items-center ${isCapacitor() ? 'justify-center p-2' : 'gap-3 px-4 py-3'} rounded-lg text-left transition-colors hover:bg-secondary`}
+              title="Group Context"
+            >
+              <Users size={isCapacitor() ? 18 : 20} />
+              {!isCapacitor() && <span>Group Context</span>}
             </button>
             
             <button
