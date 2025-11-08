@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
-import { X, Save, Trash2, Search, Bookmark, Clock, Globe, Shield, Palette, Zap, Database } from 'lucide-react'
+import { X, Save, Trash2, Search, Bookmark, Clock, Globe, Shield, Palette, Zap, Database, StickyNote } from 'lucide-react'
 import axios from 'axios'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
-export default function Settings({ isOpen, onClose }) {
+export default function Settings({ isOpen, onClose, onNotesClick }) {
   const [activeTab, setActiveTab] = useState('general')
   const [settings, setSettings] = useState(null)
   const [bookmarks, setBookmarks] = useState([])
@@ -227,6 +227,17 @@ export default function Settings({ isOpen, onClose }) {
             >
               <Clock size={20} />
               <span>History</span>
+            </button>
+            
+            <button
+              onClick={() => {
+                onClose()
+                if (onNotesClick) onNotesClick()
+              }}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors hover:bg-secondary"
+            >
+              <StickyNote size={20} />
+              <span>Notes</span>
             </button>
             
             <button

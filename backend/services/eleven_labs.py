@@ -34,11 +34,11 @@ class ElevenLabsClient:
         try:
             voice_id = voice_id or self.default_voice_id
             
-            # Generate audio using new API
+            # Generate audio using new API with free tier model
             audio_generator = self.client.generate(
                 text=text,
                 voice=voice_id,
-                model="eleven_monolingual_v1"
+                model="eleven_turbo_v2"  # Free tier compatible model
             )
             
             # Collect audio bytes

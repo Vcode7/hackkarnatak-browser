@@ -90,7 +90,7 @@ function createWindow() {
         }
       }))
 
-      // If text is selected, add "Ask AI Chat" option
+      // If text is selected, add "Ask AI Chat" and "Save as Note" options
       if (params.selectionText) {
         menu.append(new MenuItem({ type: 'separator' }))
         menu.append(new MenuItem({
@@ -98,6 +98,24 @@ function createWindow() {
           click: () => {
             // Send selected text to main window
             newWindow.webContents.send('ask-ai-with-selection', params.selectionText)
+          }
+        }))
+        menu.append(new MenuItem({
+          label: 'Save as Note',
+          click: () => {
+            // Get page info and send to main window
+            webContents.executeJavaScript(`({
+              url: window.location.href,
+              title: document.title
+            })`).then(pageInfo => {
+              newWindow.webContents.send('save-as-note', {
+                selectedText: params.selectionText,
+                pageUrl: pageInfo.url,
+                pageTitle: pageInfo.title
+              })
+            }).catch(err => {
+              console.error('Failed to get page info:', err)
+            })
           }
         }))
         menu.append(new MenuItem({

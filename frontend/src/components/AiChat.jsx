@@ -74,6 +74,24 @@ export default function AiChat() {
   }, [activeTab])
 
 
+  // Store page content in vector database
+  const storePageInVector = async (url, title, content, description) => {
+    try {
+      console.log('[AiChat] Storing page in vector database:', url);
+      await axios.post(`${API_URL}/api/vector/store-page`, {
+        url: url,
+        title: title,
+        content: content,
+        description: description,
+        access_time: new Date().toISOString()
+      });
+      console.log('[AiChat] ✅ Page stored successfully in vector database');
+    } catch (error) {
+      console.error('[AiChat] Error storing page in vector database:', error);
+      // Don't fail the main operation if storage fails
+    }
+  };
+
   const getPageContent = async () => {
     console.log('[AiChat] Getting page content...');
     console.log('[AiChat] Active tab:', activeTab);
@@ -103,7 +121,7 @@ export default function AiChat() {
             return JSON.stringify({
               title: title,
               description: metaDescription,
-              content: bodyText.slice(0, 10000) // limit to 20k chars
+              content: bodyText // Get full content for vector storage
             });
           } catch (e) {
             return JSON.stringify({ error: e.message });
@@ -117,7 +135,12 @@ export default function AiChat() {
         return `Current page: ${activeTab?.url} (content extraction failed: ${parsed.error})`;
       }
 
-      const result = `Current page: ${parsed.title}\nURL: ${activeTab.url}\n${parsed.description ? 'Description: ' + parsed.description + '\n' : ''}\nContent:\n${parsed.content}`;
+      // Store full page content in vector database (async, don't wait)
+      storePageInVector(activeTab.url, parsed.title, parsed.content, parsed.description);
+
+      // Return limited content for immediate context
+      const limitedContent = parsed.content.slice(0, 10000);
+      const result = `Current page: ${parsed.title}\nURL: ${activeTab.url}\n${parsed.description ? 'Description: ' + parsed.description + '\n' : ''}\nContent:\n${limitedContent}`;
       console.log('[AiChat] Page content extracted successfully:', result.slice(0, 200) + '...');
       return result;
     } catch (error) {
@@ -520,7 +543,7 @@ export default function AiChat() {
           >
             <div
               className={`
-                max-w-[80%] p-3 rounded-lg
+                max-w-[80%] p-3 rounded-lg overflow-hidden
                 ${message.role === 'user'
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-secondary text-foreground'
@@ -533,7 +556,7 @@ export default function AiChat() {
                   <span>Voice transcription</span>
                 </div>
               )}
-              <div className="text-sm prose prose-sm max-w-none dark:prose-invert prose-p:my-2 prose-pre:my-3 prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-headings:my-3 prose-a:text-blue-500 hover:prose-a:text-blue-600">
+              <div className="text-sm prose prose-sm max-w-none dark:prose-invert prose-p:my-2 prose-pre:my-3 prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-headings:my-3 prose-a:text-blue-500 hover:prose-a:text-blue-600 prose-table:my-3">
                 <ReactMarkdown 
                   remarkPlugins={[remarkGfm]}
                   components={{
@@ -545,7 +568,18 @@ export default function AiChat() {
                     code: ({node, inline, ...props}) => 
                       inline ? 
                         <code className="bg-muted px-1.5 py-0.5 rounded text-xs" {...props} /> : 
-                        <code className="block bg-muted p-3 rounded-lg my-2 overflow-x-auto" {...props} />,
+                        <code className="block bg-muted p-3 rounded-lg my-2 overflow-x-auto max-w-full" {...props} />,
+                    pre: ({node, ...props}) => <pre className="overflow-x-auto max-w-full" {...props} />,
+                    table: ({node, ...props}) => (
+                      <div className="overflow-x-auto max-w-full my-3">
+                        <table className="min-w-full border-collapse border border-border" {...props} />
+                      </div>
+                    ),
+                    thead: ({node, ...props}) => <thead className="bg-muted" {...props} />,
+                    tbody: ({node, ...props}) => <tbody {...props} />,
+                    tr: ({node, ...props}) => <tr className="border-b border-border" {...props} />,
+                    th: ({node, ...props}) => <th className="border border-border px-3 py-2 text-left font-semibold" {...props} />,
+                    td: ({node, ...props}) => <td className="border border-border px-3 py-2" {...props} />,
                     h1: ({node, ...props}) => <h1 className="text-xl font-bold mb-2 mt-4" {...props} />,
                     h2: ({node, ...props}) => <h2 className="text-lg font-bold mb-2 mt-3" {...props} />,
                     h3: ({node, ...props}) => <h3 className="text-base font-bold mb-2 mt-3" {...props} />,

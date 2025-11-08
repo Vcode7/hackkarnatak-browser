@@ -15,6 +15,7 @@ class LangChainService:
         if not api_key:
             raise ValueError("GROQ_API_KEY not found")
         
+        # Initialize LLM - use llama model which doesn't have tool calling issues
         self.llm = ChatGroq(
             api_key=api_key,
             model=os.getenv("GROQ_MODEL", "mixtral-8x7b-32768"),

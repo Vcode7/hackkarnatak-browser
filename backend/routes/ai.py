@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Optional
 from services.langchain_utils import langchain_service
 from services.eleven_labs import eleven_labs_client
+from services.vector_store import vector_store
 import logging
 import json
 import re
@@ -91,16 +92,41 @@ class AnswerQuestionsRequest(BaseModel):
 
 @router.post("/chat", response_model=AIResponse)
 async def chat(request: AIRequest):
-    """General AI chat endpoint"""
+    """General AI chat endpoint with RAG (Retrieval Augmented Generation)"""
     try:
-        # Generate text response
-        text_response = await langchain_service.general_chat(
+        # Query vector store for relevant context from browsing history
+        relevant_chunks = await vector_store.query_relevant_content(
             query=request.query,
-            context=request.context
+            n_results=3  # Get top 3 most relevant chunks
         )
         
-        # Generate voice response
-        audio_base64 = await eleven_labs_client.text_to_speech(text_response)
+        # Build enhanced context from vector store results
+        enhanced_context = request.context or ""
+        
+        if relevant_chunks:
+            logger.info(f"Found {len(relevant_chunks)} relevant chunks from browsing history")
+            vector_context = "\n\n--- Relevant information from your browsing history ---\n"
+            
+            for i, chunk in enumerate(relevant_chunks, 1):
+                metadata = chunk['metadata']
+                vector_context += f"\n[Source {i}] {metadata['title']} ({metadata['url']})\n"
+                vector_context += f"Accessed: {metadata['access_date']}\n"
+                vector_context += f"Content: {chunk['content'][:500]}...\n"
+            
+            enhanced_context = vector_context + "\n\n" + enhanced_context
+        
+        # Generate text response with enhanced context
+        text_response = await langchain_service.general_chat(
+            query=request.query,
+            context=enhanced_context
+        )
+        
+        # Generate voice response (optional - don't fail if quota exceeded)
+        audio_base64 = None
+        try:
+            audio_base64 = await eleven_labs_client.text_to_speech(text_response)
+        except Exception as tts_error:
+            logger.warning(f"TTS generation failed (continuing without audio): {tts_error}")
         
         # Check if query is about learning/research and suggest websites
         suggested_websites = []
@@ -130,8 +156,12 @@ async def summarize(request: SummarizeRequest):
             url=request.url
         )
         
-        # Generate voice
-        audio_base64 = await eleven_labs_client.text_to_speech(summary)
+        # Generate voice (optional)
+        audio_base64 = None
+        try:
+            audio_base64 = await eleven_labs_client.text_to_speech(summary)
+        except Exception as tts_error:
+            logger.warning(f"TTS generation failed (continuing without audio): {tts_error}")
         
         return AIResponse(
             text=summary,
@@ -152,8 +182,12 @@ async def answer_question(request: QuestionRequest):
             url=request.url
         )
         
-        # Generate voice
-        audio_base64 = await eleven_labs_client.text_to_speech(answer)
+        # Generate voice (optional)
+        audio_base64 = None
+        try:
+            audio_base64 = await eleven_labs_client.text_to_speech(answer)
+        except Exception as tts_error:
+            logger.warning(f"TTS generation failed (continuing without audio): {tts_error}")
         
         return AIResponse(
             text=answer,

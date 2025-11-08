@@ -1,14 +1,14 @@
 from dotenv import load_dotenv
 import os
 load_dotenv()
-print("Loaded GROQ_API_KEY:", os.getenv("GROQ_API_KEY"))
+print("Loaded GROQ_API_KEY:")
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import logging
 
 from database.mongodb import connect_to_mongo, close_mongo_connection
-from routes import ai, voice, browser, proxy, data, focus, auth, downloads, voice_navigation
+from routes import ai, voice, browser, proxy, data, focus, auth, downloads, voice_navigation, vector_storage, notes
 
 # Load environment variables
 
@@ -57,6 +57,8 @@ app.include_router(proxy.router, prefix="/api/proxy", tags=["Proxy"])
 app.include_router(data.router, prefix="/api/data", tags=["Data Management"])
 app.include_router(focus.router, prefix="/api", tags=["Focus Mode"])
 app.include_router(downloads.router, prefix="/api", tags=["Downloads"])
+app.include_router(vector_storage.router, prefix="/api/vector", tags=["Vector Storage"])
+app.include_router(notes.router, prefix="/api", tags=["Notes"])
 
 @app.get("/")
 async def root():

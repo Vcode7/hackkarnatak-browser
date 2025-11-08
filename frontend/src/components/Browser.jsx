@@ -31,6 +31,7 @@ import Settings from './Settings'
 import Downloads from './Downloads'
 import HighlightImportant from './HighlightImportant'
 import MobileBottomBar from './MobileBottomBar'
+import Notes from './Notes'
 import axios from 'axios'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -70,6 +71,7 @@ export default function Browser() {
   const [isDownloadsOpen, setIsDownloadsOpen] = useState(false)
   const [isHighlightOpen, setIsHighlightOpen] = useState(false)
   const [isVoiceNavActive, setIsVoiceNavActive] = useState(false)
+  const [isNotesOpen, setIsNotesOpen] = useState(false)
   const webviewRef = useRef(null)
 
   // Register webview when it changes
@@ -107,6 +109,39 @@ export default function Browser() {
           }
         })
         window.dispatchEvent(event)
+      })
+
+      window.electron.receive('save-as-note', async (data) => {
+        // Save note directly via API
+        try {
+          await axios.post(`${API_URL}/api/notes`, {
+            content: data.selectedText,
+            page_url: data.pageUrl,
+            page_title: data.pageTitle
+          })
+          
+          // Show success notification
+          const notification = document.createElement('div')
+          notification.textContent = '✓ Note saved successfully'
+          notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #10b981;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 10000;
+            font-size: 14px;
+            font-weight: 500;
+          `
+          document.body.appendChild(notification)
+          setTimeout(() => notification.remove(), 3000)
+        } catch (error) {
+          console.error('Error saving note:', error)
+          alert('Failed to save note')
+        }
       })
 
       window.electron.receive('open-link-new-tab', (url) => {
@@ -560,7 +595,8 @@ export default function Browser() {
           setIsSettingsOpen(false)
           // Reload settings when modal closes to ensure we have latest values
           loadSettings()
-        }} 
+        }}
+        onNotesClick={() => setIsNotesOpen(true)}
       />
 
       {/* Downloads Modal */}
@@ -581,6 +617,12 @@ export default function Browser() {
           updateTabUrl(activeTabId, url)
           setUrlInput(url)
         }}
+      />
+
+      {/* Notes Modal */}
+      <Notes 
+        isOpen={isNotesOpen} 
+        onClose={() => setIsNotesOpen(false)} 
       />
 
       {/* Mobile Bottom Bar - Only show on Capacitor */}
