@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Target, X, Check, AlertCircle, Clock, TrendingUp } from 'lucide-react'
 import axios from 'axios'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -16,13 +17,6 @@ export default function FocusMode({ onUrlCheck }) {
   useEffect(() => {
     checkActiveSession()
   }, [])
-
-  useEffect(() => {
-    // Notify parent when active session changes
-    if (onUrlCheck) {
-      onUrlCheck(!!activeSession)
-    }
-  }, [activeSession, onUrlCheck])
 
   const checkActiveSession = async () => {
     try {
@@ -110,10 +104,10 @@ export default function FocusMode({ onUrlCheck }) {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-48 right-4 p-4 mb-4 bg-purple-600 text-white rounded-full shadow-lg hover:scale-110 z-50"
+        className="fixed bottom-48 right-4 p-4 mb-4 bg-purple-600 text-white rounded-full shadow-lg hover:scale-110 z-100"
         title="Focus Mode"
       >
-        🎯
+        <Target size={24} />
       </button>
     )
   }
@@ -123,14 +117,14 @@ export default function FocusMode({ onUrlCheck }) {
       <div className="fixed bottom-24 right-6 bg-purple-600 text-white rounded-lg shadow-lg p-4 z-40 max-w-sm">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <span className="text-xl animate-pulse">🎯</span>
+            <Target size={20} className="animate-pulse" />
             <span className="font-semibold">Focus Mode Active</span>
           </div>
           <button
             onClick={() => setIsOpen(true)}
-            className="hover:bg-purple-700 rounded p-1 text-sm"
+            className="hover:bg-purple-700 rounded p-1"
           >
-            📊
+            <TrendingUp size={16} />
           </button>
         </div>
         <p className="text-sm opacity-90 mb-2">{activeSession.topic}</p>
@@ -143,18 +137,18 @@ export default function FocusMode({ onUrlCheck }) {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 w-96 bg-gray-800 border border-gray-700 rounded-lg shadow-2xl flex flex-col z-40 max-h-[600px]">
+    <div className="fixed bottom-6 right-6 w-72 sm:w-96 bg-background border border-border rounded-lg shadow-2xl flex flex-col z-40 max-h-[600px]">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-700 bg-purple-600 text-white rounded-t-lg">
+      <div className="flex items-center justify-between p-4 border-b border-border bg-purple-600 text-white rounded-t-lg">
         <div className="flex items-center gap-2">
-          <span className="text-xl">🎯</span>
+          <Target size={20} />
           <h3 className="font-semibold">Focus Mode</h3>
         </div>
         <button
           onClick={() => setIsOpen(false)}
-          className="p-1 hover:bg-purple-700 rounded text-lg"
+          className="p-1 hover:bg-purple-700 rounded"
         >
-          ×
+          <X size={18} />
         </button>
       </div>
 
@@ -167,20 +161,20 @@ export default function FocusMode({ onUrlCheck }) {
               <h4 className="font-semibold text-purple-900 dark:text-purple-100 mb-2">
                 Current Focus
               </h4>
-              <p className="text-lg font-medium mb-2 text-gray-800 dark:text-gray-100">{activeSession.topic}</p>
+              <p className="text-lg font-medium mb-2">{activeSession.topic}</p>
               {activeSession.description && (
-                <p className="text-sm text-gray-600 dark:text-gray-400">{activeSession.description}</p>
+                <p className="text-sm text-muted-foreground">{activeSession.description}</p>
               )}
             </div>
 
             {activeSession.keywords && activeSession.keywords.length > 0 && (
               <div>
-                <h5 className="text-sm font-medium mb-2 text-gray-100">Keywords:</h5>
+                <h5 className="text-sm font-medium mb-2">Keywords:</h5>
                 <div className="flex flex-wrap gap-2">
                   {activeSession.keywords.map((keyword, idx) => (
                     <span
                       key={idx}
-                      className="px-2 py-1 bg-gray-700 text-gray-100 text-xs rounded-full"
+                      className="px-2 py-1 bg-secondary text-xs rounded-full"
                     >
                       {keyword}
                     </span>
@@ -194,8 +188,8 @@ export default function FocusMode({ onUrlCheck }) {
                 <h5 className="text-sm font-medium mb-2">Whitelisted Domains:</h5>
                 <div className="space-y-1">
                   {activeSession.allowed_domains.map((domain, idx) => (
-                    <div key={idx} className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                      <span>✓</span>
+                    <div key={idx} className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Check size={12} className="text-green-500" />
                       {domain}
                     </div>
                   ))}
@@ -203,26 +197,26 @@ export default function FocusMode({ onUrlCheck }) {
               </div>
             )}
 
-            <div className="bg-gray-700 p-4 rounded-lg">
-              <h5 className="text-sm font-medium mb-3 text-gray-100">Session Statistics</h5>
+            <div className="bg-secondary p-4 rounded-lg">
+              <h5 className="text-sm font-medium mb-3">Session Statistics</h5>
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div>
-                  <div className="text-2xl font-bold text-blue-500">
+                  <div className="text-2xl font-bold text-blue-600">
                     {activeSession.urls_checked || 0}
                   </div>
-                  <div className="text-xs text-gray-400">Checked</div>
+                  <div className="text-xs text-muted-foreground">Checked</div>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-green-500">
+                  <div className="text-2xl font-bold text-green-600">
                     {activeSession.urls_allowed || 0}
                   </div>
-                  <div className="text-xs text-gray-400">Allowed</div>
+                  <div className="text-xs text-muted-foreground">Allowed</div>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-red-500">
+                  <div className="text-2xl font-bold text-red-600">
                     {activeSession.urls_blocked || 0}
                   </div>
-                  <div className="text-xs text-gray-400">Blocked</div>
+                  <div className="text-xs text-muted-foreground">Blocked</div>
                 </div>
               </div>
             </div>
@@ -251,10 +245,10 @@ export default function FocusMode({ onUrlCheck }) {
           <div className="space-y-4">
             <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
               <div className="flex items-start gap-2">
-                <span className="text-xl flex-shrink-0">ℹ️</span>
+                <AlertCircle size={20} className="text-purple-600 flex-shrink-0 mt-0.5" />
                 <div className="text-sm">
                   <p className="font-medium mb-1">What is Focus Mode?</p>
-                  <p className="text-gray-600 dark:text-gray-400">
+                  <p className="text-muted-foreground">
                     AI will check every URL before loading. Only relevant websites for your topic will be allowed.
                   </p>
                 </div>
@@ -262,7 +256,7 @@ export default function FocusMode({ onUrlCheck }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2 text-gray-100">
+              <label className="block text-sm font-medium mb-2">
                 Focus Topic *
               </label>
               <input
@@ -270,12 +264,12 @@ export default function FocusMode({ onUrlCheck }) {
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
                 placeholder="e.g., Machine Learning Research"
-                className="w-full px-3 py-2 bg-gray-800 rounded-lg border border-gray-700 text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-600"
+                className="w-full px-3 py-2 bg-secondary rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-purple-600"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2 text-gray-100">
+              <label className="block text-sm font-medium mb-2">
                 Description (Optional)
               </label>
               <textarea
@@ -283,12 +277,12 @@ export default function FocusMode({ onUrlCheck }) {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Describe what you're working on..."
                 rows={2}
-                className="w-full px-3 py-2 bg-gray-800 rounded-lg border border-gray-700 text-gray-100 resize-none focus:outline-none focus:ring-2 focus:ring-purple-600"
+                className="w-full px-3 py-2 bg-secondary rounded-lg border border-border resize-none focus:outline-none focus:ring-2 focus:ring-purple-600"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2 text-gray-100">
+              <label className="block text-sm font-medium mb-2">
                 Keywords (comma-separated)
               </label>
               <input
@@ -296,12 +290,12 @@ export default function FocusMode({ onUrlCheck }) {
                 value={keywords}
                 onChange={(e) => setKeywords(e.target.value)}
                 placeholder="AI, neural networks, deep learning"
-                className="w-full px-3 py-2 bg-gray-800 rounded-lg border border-gray-700 text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-600"
+                className="w-full px-3 py-2 bg-secondary rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-purple-600"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2 text-gray-100">
+              <label className="block text-sm font-medium mb-2">
                 Whitelisted Domains (comma-separated)
               </label>
               <input
@@ -309,9 +303,9 @@ export default function FocusMode({ onUrlCheck }) {
                 value={allowedDomains}
                 onChange={(e) => setAllowedDomains(e.target.value)}
                 placeholder="arxiv.org, github.com, stackoverflow.com"
-                className="w-full px-3 py-2 bg-gray-800 rounded-lg border border-gray-700 text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-600"
+                className="w-full px-3 py-2 bg-secondary rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-purple-600"
               />
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 These domains will always be allowed
               </p>
             </div>
