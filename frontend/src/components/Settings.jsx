@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Save, Trash2, Search, Bookmark, Clock, Globe, Shield, Palette, Zap, Database, StickyNote, Brain, Users } from 'lucide-react'
+import { X, Save, Trash2, Search, Bookmark, Clock, Globe, Shield, Palette, Zap, Database, StickyNote, Brain, Users, LogOut, User } from 'lucide-react'
 import axios from 'axios'
 import { isCapacitor } from '../utils/platform'
 
@@ -13,12 +13,23 @@ export default function Settings({ isOpen, onClose, onNotesClick, onQuizClick, o
   const [searchQuery, setSearchQuery] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [userInfo, setUserInfo] = useState({
+    userId: localStorage.getItem('user_id') || 'default_user',
+    userName: localStorage.getItem('user_name') || 'Guest User',
+    userEmail: localStorage.getItem('user_email') || 'guest@example.com'
+  })
 
   useEffect(() => {
     if (isOpen) {
       loadSettings()
       loadBookmarks()
       loadHistory()
+      // Refresh user info
+      setUserInfo({
+        userId: localStorage.getItem('user_id') || 'default_user',
+        userName: localStorage.getItem('user_name') || 'Guest User',
+        userEmail: localStorage.getItem('user_email') || 'guest@example.com'
+      })
     }
   }, [isOpen])
 
@@ -137,6 +148,19 @@ export default function Settings({ isOpen, onClose, onNotesClick, onQuizClick, o
     setSettings({ ...settings, [key]: value })
   }
 
+  const handleLogout = () => {
+    if (confirm('Are you sure you want to logout?')) {
+      // Clear user data
+      localStorage.removeItem('user_id')
+      localStorage.removeItem('user_name')
+      localStorage.removeItem('user_email')
+      localStorage.removeItem('auth_token')
+      
+      // Reload the page to reset state
+      window.location.reload()
+    }
+  }
+
   if (!isOpen || !settings) return null
 
   const filteredBookmarks = searchQuery && activeTab === 'bookmarks' 
@@ -158,13 +182,33 @@ export default function Settings({ isOpen, onClose, onNotesClick, onQuizClick, o
       <div className="bg-background w-full max-w-4xl h-[80vh] rounded-lg shadow-2xl flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border">
-          <h2 className="text-2xl font-bold">Settings</h2>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-secondary rounded-lg"
-          >
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl font-bold">Settings</h2>
+            {isCapacitor() && (
+              <div className="flex items-center gap-2 text-sm">
+                <User size={16} className="text-muted-foreground" />
+                <span className="text-muted-foreground">{userInfo.userName}</span>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {isCapacitor() && (
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                title="Logout"
+              >
+                <LogOut size={18} />
+                <span className="hidden sm:inline">Logout</span>
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-secondary rounded-lg"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-1 overflow-hidden">
@@ -289,6 +333,41 @@ export default function Settings({ isOpen, onClose, onNotesClick, onQuizClick, o
             {/* General Settings */}
             {activeTab === 'general' && (
               <div className="space-y-6">
+                {/* User Account Info */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Account Information</h3>
+                  <div className="p-4 bg-secondary rounded-lg space-y-3">
+                    <div className="flex items-center gap-3">
+                      <User size={20} className="text-primary" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">User Name</p>
+                        <p className="font-medium">{userInfo.userName}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Globe size={20} className="text-primary" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Email</p>
+                        <p className="font-medium">{userInfo.userEmail}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Database size={20} className="text-primary" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">User ID</p>
+                        <p className="font-mono text-sm">{userInfo.userId}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 mt-4"
+                    >
+                      <LogOut size={18} />
+                      <span>Logout</span>
+                    </button>
+                  </div>
+                </div>
+
                 <div>
                   <h3 className="text-lg font-semibold mb-4">General Settings</h3>
                   

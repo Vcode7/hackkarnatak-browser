@@ -17,6 +17,7 @@ export default function AiChatFullScreen() {
   const [transcribingText, setTranscribingText] = useState('')
   const [typingMessageIndex, setTypingMessageIndex] = useState(null)
   const [displayedContent, setDisplayedContent] = useState('')
+  const [activeGroupId, setActiveGroupId] = useState(null)
 
   const messagesEndRef = useRef(null)
   const typingIntervalRef = useRef(null)
@@ -51,6 +52,12 @@ export default function AiChatFullScreen() {
         role: 'assistant',
         content: 'Hi! I\'m AiChat in full-screen mode. How can I help you?'
       }])
+    }
+
+    // Load active group ID
+    const savedGroupId = localStorage.getItem('active_group_id')
+    if (savedGroupId) {
+      setActiveGroupId(savedGroupId)
     }
   }, [])
 
@@ -116,7 +123,8 @@ export default function AiChatFullScreen() {
       const response = await axios.post(`${API_URL}/api/ai/chat`, {
         query: messageText,
         context: pageContent,
-        page_url: activeTab?.url
+        page_url: activeTab?.url,
+        group_id: activeGroupId || null
       })
 
       const assistantMessage = {
@@ -233,7 +241,12 @@ export default function AiChatFullScreen() {
       <div className="flex items-center justify-between p-4 border-b border-border bg-primary text-primary-foreground">
         <div className="flex items-center gap-3">
           <MessageCircle size={24} />
-          <h1 className="text-xl font-semibold">AiChat Assistant - Full Screen</h1>
+          <div>
+            <h1 className="text-xl font-semibold">AiChat Assistant - Full Screen</h1>
+            {activeGroupId && (
+              <p className="text-sm opacity-70">🔗 Using Group Context</p>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-3">
           {isPlaying && (

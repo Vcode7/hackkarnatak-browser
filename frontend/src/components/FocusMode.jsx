@@ -16,6 +16,13 @@ export default function FocusMode({ onUrlCheck }) {
 
   useEffect(() => {
     checkActiveSession()
+    
+    // Poll for active session updates every 3 seconds
+    const interval = setInterval(() => {
+      checkActiveSession()
+    }, 3000)
+    
+    return () => clearInterval(interval)
   }, [])
 
   const checkActiveSession = async () => {

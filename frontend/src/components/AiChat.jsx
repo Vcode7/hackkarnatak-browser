@@ -25,6 +25,7 @@ export default function AiChat() {
   const [recordingMode, setRecordingMode] = useState(null) // 'tap' or 'hold'
   const [typingMessageIndex, setTypingMessageIndex] = useState(null)
   const [displayedContent, setDisplayedContent] = useState('')
+  const [activeGroupId, setActiveGroupId] = useState(null)
 
   const messagesEndRef = useRef(null)
   const typingIntervalRef = useRef(null)
@@ -41,6 +42,14 @@ export default function AiChat() {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  useEffect(() => {
+    // Load active group from localStorage
+    const savedGroupId = localStorage.getItem('active_group_id')
+    if (savedGroupId) {
+      setActiveGroupId(savedGroupId)
+    }
+  }, [])
 
   // Listen for voice command events and text selection AI chat
   useEffect(() => {
@@ -261,7 +270,8 @@ export default function AiChat() {
       const response = await axios.post(`${API_URL}/api/ai/chat`, {
         query: messageText,
         context: contextToSend,
-        page_url: activeTab?.url
+        page_url: activeTab?.url,
+        group_id: activeGroupId || null
       })
 
       const assistantMessage = {
@@ -619,7 +629,12 @@ export default function AiChat() {
       <div className="flex items-center justify-between p-4 border-b border-border bg-primary text-primary-foreground rounded-t-lg">
         <div className="flex items-center gap-2">
           <MessageCircle size={20} />
-          <h3 className="font-semibold">AiChat Assistant</h3>
+          <div>
+            <h3 className="font-semibold">AiChat Assistant</h3>
+            {activeGroupId && (
+              <p className="text-xs opacity-70">🔗 Using Group Context</p>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {isPlaying && (

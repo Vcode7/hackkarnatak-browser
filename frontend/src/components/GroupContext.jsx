@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Users, Plus, Copy, Check, LogOut, Trash2, RefreshCw } from 'lucide-react'
+import { X, Users, Plus, Copy, Check, LogOut, Trash2, RefreshCw, ArrowLeft } from 'lucide-react'
 import axios from 'axios'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -15,6 +15,7 @@ export default function GroupContext({ isOpen, onClose }) {
   const [joinCode, setJoinCode] = useState('')
   const [copiedCode, setCopiedCode] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [showSidebar, setShowSidebar] = useState(true)
 
   useEffect(() => {
     if (isOpen) {
@@ -25,6 +26,11 @@ export default function GroupContext({ isOpen, onClose }) {
   useEffect(() => {
     if (activeGroup) {
       loadGroupContexts(activeGroup.id)
+      // Auto-refresh contexts every 10 seconds when group is active
+      const interval = setInterval(() => {
+        loadGroupContexts(activeGroup.id)
+      }, 10000)
+      return () => clearInterval(interval)
     }
   }, [activeGroup])
 
@@ -136,11 +142,15 @@ export default function GroupContext({ isOpen, onClose }) {
       })
       
       if (response.data.success) {
-        alert('Left group successfully')
+        // Clear active group if it was the one we left
         if (activeGroup?.id === groupId) {
           setActiveGroup(null)
+          setGroupContexts([])
+          localStorage.removeItem('active_group_id')
         }
-        loadGroups()
+        // Reload groups list to remove the left group
+        await loadGroups()
+        alert('Left group successfully')
       }
     } catch (error) {
       console.error('Error leaving group:', error)
@@ -170,7 +180,7 @@ export default function GroupContext({ isOpen, onClose }) {
         {/* Content */}
         <div className="flex-1 flex overflow-hidden">
           {/* Sidebar - Groups List */}
-          <div className="w-80 border-r border-border flex flex-col">
+          <div className={`${showSidebar ? 'flex' : 'hidden'} sm:flex w-full sm:w-64 md:w-80 border-r border-border flex-col overflow-hidden`}>
             <div className="p-4 border-b border-border">
               <div className="flex gap-2">
                 <button
@@ -206,7 +216,15 @@ export default function GroupContext({ isOpen, onClose }) {
                 groups.map(group => (
                   <div
                     key={group.id}
-                    onClick={() => setActiveGroup(group)}
+                    onClick={() => {
+                      setActiveGroup(group)
+                      // Save active group to localStorage for AI chat
+                      localStorage.setItem('active_group_id', group.id)
+                      // Hide sidebar on mobile when group is selected
+                      if (window.innerWidth < 640) {
+                        setShowSidebar(false)
+                      }
+                    }}
                     className={`p-3 rounded-lg cursor-pointer transition-colors ${
                       activeGroup?.id === group.id
                         ? 'bg-primary text-primary-foreground'
@@ -238,8 +256,17 @@ export default function GroupContext({ isOpen, onClose }) {
                 {/* Group Header */}
                 <div className="p-4 border-b border-border">
                   <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold">{activeGroup.name}</h3>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <button
+                          onClick={() => setShowSidebar(true)}
+                          className="sm:hidden p-1 hover:bg-secondary rounded"
+                          title="Back to groups"
+                        >
+                          <ArrowLeft size={20} />
+                        </button>
+                        <h3 className="text-lg font-semibold">{activeGroup.name}</h3>
+                      </div>
                       {activeGroup.description && (
                         <p className="text-sm text-muted-foreground mt-1">{activeGroup.description}</p>
                       )}
@@ -271,7 +298,16 @@ export default function GroupContext({ isOpen, onClose }) {
 
                 {/* Shared Contexts */}
                 <div className="flex-1 overflow-y-auto p-4">
-                  <h4 className="font-semibold mb-4">Shared Research Context ({groupContexts.length})</h4>
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-semibold">Shared Research Context ({groupContexts.length})</h4>
+                    <button
+                      onClick={() => loadGroupContexts(activeGroup.id)}
+                      className="p-2 hover:bg-secondary rounded-lg"
+                      title="Refresh contexts"
+                    >
+                      <RefreshCw size={18} />
+                    </button>
+                  </div>
                   
                   {groupContexts.length === 0 ? (
                     <div className="text-center text-muted-foreground py-12">
