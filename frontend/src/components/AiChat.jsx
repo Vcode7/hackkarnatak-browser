@@ -206,7 +206,17 @@ export default function AiChat() {
     if (!activeTab?.webview) {
       console.warn('[AiChat] Webview not available for tab:', activeTab.id);
       console.log('[AiChat] Active tab object:', JSON.stringify(activeTab, null, 2));
-      return `Current page: ${activeTab?.url || 'No page loaded'} (content not accessible - webview not loaded yet)`;
+      
+      // Return basic info - AI can still answer general questions
+      return `I can see you're on: ${activeTab?.url || 'the home page'}
+
+Note: I cannot access the page content directly (this may happen on mobile or if the page just loaded). However, I can:
+- Answer general questions about the topic
+- Help you with web searches
+- Provide information based on the URL
+- Use any previously saved context from your browsing history
+
+What would you like to know?`;
     }
 
     try {
@@ -245,7 +255,21 @@ export default function AiChat() {
       return result;
     } catch (error) {
       console.error('[AiChat] Error extracting page content:', error);
-      return `Current page: ${activeTab?.url || 'No page loaded'} (error: ${error.message})`;
+      
+      // Friendly error message
+      return `I can see you're on: ${activeTab?.url || 'the home page'}
+
+Note: I couldn't access the page content (${error.message}). This can happen on:
+- Mobile devices with security restrictions
+- Pages that just started loading
+- Cross-origin protected pages
+
+However, I can still help you! Ask me anything and I'll use:
+- Information from the URL
+- Your browsing history context
+- General knowledge about the topic
+
+What would you like to know?`;
     }
   };
 

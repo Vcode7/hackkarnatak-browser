@@ -368,3 +368,42 @@ async def leave_group(group_id: str, user_id: str = "default_user"):
     except Exception as e:
         logger.error(f"Error leaving group: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/groups/{group_id}/delete")
+async def delete_group(group_id: str, user_id: str = "default_user"):
+    """Delete a group (only admin can delete)"""
+    try:
+        db = get_database()
+        
+        if not ObjectId.is_valid(group_id):
+            raise HTTPException(status_code=400, detail="Invalid group ID")
+        
+        group = await db.groups.find_one({"_id": ObjectId(group_id)})
+        
+        if not group:
+            raise HTTPException(status_code=404, detail="Group not found")
+        
+        # Check if user is admin
+        user_member = next((m for m in group.get("members", []) if m["user_id"] == user_id), None)
+        
+        if not user_member or user_member["role"] != "admin":
+            raise HTTPException(status_code=403, detail="Only group admins can delete the group")
+        
+        # Delete all shared contexts for this group
+        await db.shared_contexts.delete_many({"group_id": group_id})
+        
+        # Delete the group
+        await db.groups.delete_one({"_id": ObjectId(group_id)})
+        
+        logger.info(f"Group {group_id} deleted by admin {user_id}")
+        
+        return {
+            "success": True,
+            "message": "Group deleted successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting group: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

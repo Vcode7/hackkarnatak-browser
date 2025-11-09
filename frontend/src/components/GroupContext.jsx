@@ -158,11 +158,36 @@ export default function GroupContext({ isOpen, onClose }) {
     }
   }
 
+  const deleteGroup = async (groupId) => {
+    if (!confirm('⚠️ WARNING: This will permanently delete the group and all shared contexts. This action cannot be undone!\n\nAre you sure you want to delete this group?')) return
+
+    try {
+      const response = await axios.delete(`${API_URL}/api/groups/${groupId}/delete`, {
+        params: { user_id: localStorage.getItem('user_id') || 'default_user' }
+      })
+      
+      if (response.data.success) {
+        // Clear active group if it was the one deleted
+        if (activeGroup?.id === groupId) {
+          setActiveGroup(null)
+          setGroupContexts([])
+          localStorage.removeItem('active_group_id')
+        }
+        // Reload groups list
+        await loadGroups()
+        alert('Group deleted successfully')
+      }
+    } catch (error) {
+      console.error('Error deleting group:', error)
+      alert(error.response?.data?.detail || 'Failed to delete group')
+    }
+  }
+
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-background rounded-lg shadow-2xl w-full max-w-6xl h-[80vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="bg-background rounded-lg shadow-2xl w-full max-w-6xl h-[90vh] sm:h-[80vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border">
           <div className="flex items-center gap-3">
@@ -180,7 +205,7 @@ export default function GroupContext({ isOpen, onClose }) {
         {/* Content */}
         <div className="flex-1 flex overflow-hidden">
           {/* Sidebar - Groups List */}
-          <div className={`${showSidebar ? 'flex' : 'hidden'} sm:flex w-full sm:w-64 md:w-80 border-r border-border flex-col overflow-hidden`}>
+          <div className={`${showSidebar ? 'flex' : 'hidden'} sm:flex w-full sm:w-56 md:w-72 lg:w-80 border-r border-border flex-col overflow-hidden`}>
             <div className="p-4 border-b border-border">
               <div className="flex gap-2">
                 <button
@@ -270,8 +295,9 @@ export default function GroupContext({ isOpen, onClose }) {
                       {activeGroup.description && (
                         <p className="text-sm text-muted-foreground mt-1">{activeGroup.description}</p>
                       )}
-                      <div className="flex items-center gap-4 mt-3">
-                        <div className="flex items-center gap-2">
+                      {/* Invite Code - Responsive */}
+                      <div className="mt-3 space-y-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm text-muted-foreground">Invite Code:</span>
                           <code className="px-2 py-1 bg-secondary rounded text-sm font-mono">
                             {activeGroup.invite_code}
@@ -284,13 +310,27 @@ export default function GroupContext({ isOpen, onClose }) {
                             {copiedCode ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
                           </button>
                         </div>
-                        <button
-                          onClick={() => leaveGroup(activeGroup.id)}
-                          className="flex items-center gap-2 px-3 py-1 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
-                        >
-                          <LogOut size={16} />
-                          <span>Leave Group</span>
-                        </button>
+                        {/* Action Buttons - Stack on mobile */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <button
+                            onClick={() => leaveGroup(activeGroup.id)}
+                            className="flex items-center gap-2 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                          >
+                            <LogOut size={16} />
+                            <span>Leave</span>
+                          </button>
+                          {/* Show delete button only for admins */}
+                          {activeGroup.members?.find(m => m.user_id === (localStorage.getItem('user_id') || 'default_user'))?.role === 'admin' && (
+                            <button
+                              onClick={() => deleteGroup(activeGroup.id)}
+                              className="flex items-center gap-2 px-3 py-1.5 text-sm text-white bg-red-600 hover:bg-red-700 rounded"
+                              title="Delete Group (Admin Only)"
+                            >
+                              <Trash2 size={16} />
+                              <span>Delete</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
